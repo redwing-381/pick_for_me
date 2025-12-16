@@ -89,7 +89,9 @@ function buildConversationContext(history: any[], currentMessage: string): Conve
     lastUserQuery: currentMessage,
     extractedPreferences: extractPreferencesFromHistory(history),
     clarificationNeeded: needsClarification,
-    stage: hasBusinessRecommendations ? 'decision_made' : 'searching'
+    stage: hasBusinessRecommendations ? 'decision_made' : 'searching',
+    travelContext: undefined,
+    interactionHistory: []
   };
 }
 

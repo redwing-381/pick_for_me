@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPinIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import type { Location, LocationInputProps } from '@/lib/types';
-import { isValidCoordinates } from '@/lib/location-utils';
+import { MapPinIcon, MagnifyingGlassIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import type { Location, LocationInputProps, EnhancedLocation } from '@/lib/types';
+import { isValidCoordinates, resolveCoordinatesToDetails } from '@/lib/location-utils';
 import { LOCATION_CONFIG, ERROR_MESSAGES } from '@/lib/constants';
 
 export default function LocationInput({
@@ -17,6 +17,8 @@ export default function LocationInput({
   const [isManualMode, setIsManualMode] = useState(false);
   const [suggestions, setSuggestions] = useState<Location[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [pendingLocation, setPendingLocation] = useState<EnhancedLocation | null>(null);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
 
   // Auto-detect location on component mount if no current location
   useEffect(() => {
@@ -73,16 +75,18 @@ export default function LocationInput({
       }
 
       try {
-        // Reverse geocode to get address
-        console.log('Attempting reverse geocode for:', latitude, longitude);
-        const location = await reverseGeocode(latitude, longitude);
-        console.log('Reverse geocode success:', location);
-        onLocationChange({
-          error: null,
-          location,
-        });
+        // Use enhanced geocoding to get detailed location information
+        console.log('Attempting enhanced reverse geocode for:', latitude, longitude);
+        setIsResolvingLocation(true);
+        const enhancedLocation = await resolveCoordinatesToDetails(latitude, longitude);
+        console.log('Enhanced reverse geocode success:', enhancedLocation);
+        
+        // Show confirmation UI for auto-detected location
+        setPendingLocation(enhancedLocation);
+        setIsResolvingLocation(false);
       } catch (err) {
-        console.log('Reverse geocode failed, using coordinates only:', err);
+        console.log('Enhanced reverse geocode failed, using basic coordinates:', err);
+        setIsResolvingLocation(false);
         // Even if reverse geocoding fails, we still have coordinates
         onLocationChange({
           error: null,
@@ -92,6 +96,7 @@ export default function LocationInput({
             address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
             city: 'Unknown',
             state: 'Unknown',
+            zipCode: 'Unknown',
             country: 'US',
           },
         });
@@ -142,6 +147,21 @@ export default function LocationInput({
     }
   };
 
+  const handleConfirmLocation = () => {
+    if (pendingLocation) {
+      onLocationChange({
+        error: null,
+        location: pendingLocation,
+      });
+      setPendingLocation(null);
+    }
+  };
+
+  const handleRejectLocation = () => {
+    setPendingLocation(null);
+    setIsManualMode(true);
+  };
+
   const handleSelectSuggestion = (location: Location) => {
     setManualInput(location.address);
     setSuggestions([]);
@@ -188,18 +208,68 @@ export default function LocationInput({
           Your Location
         </h3>
 
+        {/* Pending Location Confirmation */}
+        {pendingLocation && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start">
+                <MapPinIcon className="h-5 w-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-800 mb-1">
+                    Is this your location?
+                  </p>
+                  <p className="text-sm text-blue-700 font-medium">
+                    {pendingLocation.displayName}
+                  </p>
+                  <div className="text-xs text-blue-600 mt-1 space-y-0.5">
+                    <p>City: {pendingLocation.city}</p>
+                    <p>State: {pendingLocation.state}</p>
+                    {pendingLocation.zipCode && pendingLocation.zipCode !== 'Unknown' && (
+                      <p>Zip: {pendingLocation.zipCode}</p>
+                    )}
+                    <p>Confidence: {Math.round(pendingLocation.confidence * 100)}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex space-x-2 mt-3">
+              <button
+                onClick={handleConfirmLocation}
+                className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <CheckIcon className="h-4 w-4 mr-1" />
+                Yes, that&apos;s correct
+              </button>
+              <button
+                onClick={handleRejectLocation}
+                className="flex items-center px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                <XMarkIcon className="h-4 w-4 mr-1" />
+                No, enter manually
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Current Location Display */}
-        {currentLocation && (
+        {currentLocation && !pendingLocation && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
             <div className="flex items-center">
               <MapPinIcon className="h-5 w-5 text-green-600 mr-2" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-green-800">
                   Current Location
                 </p>
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-green-600 font-medium">
                   {currentLocation.address}
                 </p>
+                {/* Enhanced location details */}
+                <div className="text-xs text-green-600 mt-1 space-y-0.5">
+                  <p>City: {currentLocation.city}, State: {currentLocation.state}</p>
+                  {currentLocation.zipCode && currentLocation.zipCode !== 'Unknown' && (
+                    <p>Zip Code: {currentLocation.zipCode}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -213,16 +283,21 @@ export default function LocationInput({
         )}
 
         {/* Auto-detect Button */}
-        {!isManualMode && (
+        {!isManualMode && !pendingLocation && (
           <button
             onClick={handleDetectLocation}
-            disabled={isDetecting}
+            disabled={isDetecting || isResolvingLocation}
             className="w-full mb-4 flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDetecting ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Detecting Location...
+              </>
+            ) : isResolvingLocation ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Resolving Address...
               </>
             ) : (
               <>
@@ -234,14 +309,16 @@ export default function LocationInput({
         )}
 
         {/* Manual Input Toggle */}
-        <div className="text-center mb-4">
-          <button
-            onClick={() => setIsManualMode(!isManualMode)}
-            className="text-sm text-blue-600 hover:text-blue-800 underline"
-          >
-            {isManualMode ? 'Use automatic detection' : 'Enter location manually'}
-          </button>
-        </div>
+        {!pendingLocation && (
+          <div className="text-center mb-4">
+            <button
+              onClick={() => setIsManualMode(!isManualMode)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              {isManualMode ? 'Use automatic detection' : 'Enter location manually'}
+            </button>
+          </div>
+        )}
 
         {/* Manual Input Form */}
         {isManualMode && (
@@ -296,11 +373,17 @@ export default function LocationInput({
         )}
 
         {/* Location Info */}
-        {currentLocation && (
+        {currentLocation && !pendingLocation && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="text-xs text-gray-500 space-y-1">
               <p>Coordinates: {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}</p>
               <p>City: {currentLocation.city}, {currentLocation.state}</p>
+              {currentLocation.zipCode && currentLocation.zipCode !== 'Unknown' && (
+                <p>Zip Code: {currentLocation.zipCode}</p>
+              )}
+              {currentLocation.country && (
+                <p>Country: {currentLocation.country}</p>
+              )}
             </div>
           </div>
         )}

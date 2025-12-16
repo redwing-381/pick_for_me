@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Location } from '@/lib/types';
-import { isValidCoordinates } from '@/lib/location-utils';
+import type { Location, EnhancedLocation } from '@/lib/types';
+import { isValidCoordinates, resolveCoordinatesToDetails } from '@/lib/location-utils';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,88 +18,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use a geocoding service to reverse geocode coordinates
-    // For now, we'll use a mock implementation
-    // In production, you would integrate with Google Maps, MapBox, or similar service
-    const location = await reverseGeocodeCoordinates(lat, lng);
+    // Use enhanced geocoding with caching
+    const enhancedLocation = await resolveCoordinatesToDetails(lat, lng);
 
-    return NextResponse.json({
+    // Set caching headers for performance optimization
+    const response = NextResponse.json({
       success: true,
-      location,
+      location: enhancedLocation,
+      enhanced: true,
+      cached: false, // This would be determined by the caching layer
     });
+
+    // Add cache headers (24 hours for location data)
+    response.headers.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200');
+    response.headers.set('ETag', `"${lat.toFixed(6)}-${lng.toFixed(6)}"`);
+
+    return response;
   } catch (error) {
-    console.error('Reverse geocoding error:', error);
+    console.error('Enhanced reverse geocoding error:', error);
+    
+    let errorCode = 'GEOCODING_ERROR';
+    let statusCode = 500;
+    let userMessage = 'Failed to resolve location details. Please try again.';
+    let retryable = true;
+
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid coordinates')) {
+        errorCode = 'INVALID_COORDINATES';
+        statusCode = 400;
+        userMessage = 'Invalid coordinates provided.';
+        retryable = false;
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorCode = 'NETWORK_ERROR';
+        statusCode = 503;
+        userMessage = 'Network error. Please check your connection and try again.';
+        retryable = true;
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Failed to reverse geocode coordinates' },
-      { status: 500 }
+      { 
+        success: false,
+        error: {
+          code: errorCode,
+          message: userMessage,
+          retryable,
+          timestamp: new Date().toISOString()
+        }
+      },
+      { status: statusCode }
     );
   }
 }
 
-async function reverseGeocodeCoordinates(lat: number, lng: number): Promise<Location> {
-  // Mock implementation - in production, integrate with a real geocoding service
-  // This is a simplified version that provides basic location data
-  
-  // Determine approximate region based on coordinates
-  let city = 'Unknown City';
-  let state = 'Unknown State';
-  let country = 'US';
-  let address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-  // Simple region detection for major US cities (mock data)
-  if (lat >= 37.7 && lat <= 37.8 && lng >= -122.5 && lng <= -122.4) {
-    city = 'San Francisco';
-    state = 'CA';
-    address = 'San Francisco, CA, USA';
-  } else if (lat >= 40.7 && lat <= 40.8 && lng >= -74.1 && lng <= -73.9) {
-    city = 'New York';
-    state = 'NY';
-    address = 'New York, NY, USA';
-  } else if (lat >= 34.0 && lat <= 34.1 && lng >= -118.3 && lng <= -118.2) {
-    city = 'Los Angeles';
-    state = 'CA';
-    address = 'Los Angeles, CA, USA';
-  } else if (lat >= 41.8 && lat <= 41.9 && lng >= -87.7 && lng <= -87.6) {
-    city = 'Chicago';
-    state = 'IL';
-    address = 'Chicago, IL, USA';
-  } else if (lat >= 29.7 && lat <= 29.8 && lng >= -95.4 && lng <= -95.3) {
-    city = 'Houston';
-    state = 'TX';
-    address = 'Houston, TX, USA';
-  } else if (lat >= 43.6 && lat <= 43.7 && lng >= -79.4 && lng <= -79.3) {
-    city = 'Toronto';
-    state = 'ON';
-    country = 'CA';
-    address = 'Toronto, ON, Canada';
-  }
-
-  // In production, you would make an API call like this:
-  /*
-  const response = await fetch(
-    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.GOOGLE_MAPS_API_KEY}`
-  );
-  
-  if (!response.ok) {
-    throw new Error('Geocoding API request failed');
-  }
-  
-  const data = await response.json();
-  
-  if (data.status !== 'OK' || !data.results.length) {
-    throw new Error('No results found');
-  }
-  
-  const result = data.results[0];
-  // Parse the result to extract city, state, country, etc.
-  */
-
-  return {
-    latitude: lat,
-    longitude: lng,
-    address,
-    city,
-    state,
-    country,
-  };
-}

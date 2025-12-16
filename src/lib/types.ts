@@ -30,6 +30,7 @@ export interface Location {
   address: string;
   city: string;
   state: string;
+  zipCode?: string;
   country?: string;
 }
 
@@ -37,6 +38,30 @@ export interface LocationDetectionState {
   isDetecting: boolean;
   hasPermission: boolean | null;
   error: string | null;
+}
+
+export interface EnhancedLocation extends Location {
+  zipCode: string;
+  displayName: string;
+  confidence: number;
+  timezone?: string;
+  localTime?: string;
+}
+
+export interface LocationDetails {
+  formattedAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  timezone?: string;
+  localTime?: string;
+}
+
+export interface LocationCacheEntry {
+  location: EnhancedLocation;
+  timestamp: number;
+  expiresAt: number;
 }
 
 // =============================================================================
@@ -115,7 +140,16 @@ export interface MessageMetadata {
   location?: Location;
   reasoning?: string;
   suggested_actions?: string[];
+  interactive_suggestions?: InteractiveSuggestion[];
   requires_clarification?: boolean;
+}
+
+export interface InteractiveSuggestion {
+  id: string;
+  text: string;
+  action: 'query' | 'book' | 'explore' | 'clarify';
+  data?: any;
+  category?: 'travel' | 'dining' | 'accommodation' | 'transportation' | 'attraction';
 }
 
 export interface ConversationState {
@@ -130,6 +164,67 @@ export interface ConversationContext {
   extractedPreferences: Partial<UserPreferences>;
   clarificationNeeded: boolean;
   stage: ConversationStage;
+  travelContext?: TravelContext;
+  interactionHistory: InteractionHistoryEntry[];
+}
+
+export interface TravelContext {
+  destination?: Location;
+  travelDates?: {
+    startDate: Date;
+    endDate: Date;
+  };
+  groupSize?: number;
+  budget?: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  travelStyle?: 'budget' | 'mid-range' | 'luxury' | 'adventure' | 'cultural';
+  interests?: string[];
+  currentItinerary?: TravelItinerary;
+}
+
+export interface TravelItinerary {
+  id: string;
+  name: string;
+  destination: Location;
+  days: ItineraryDay[];
+  totalEstimatedCost?: number;
+}
+
+export interface ItineraryDay {
+  date: Date;
+  activities: PlannedActivity[];
+  accommodation?: Business;
+  meals: Business[];
+  transportation?: TransportationPlan[];
+  notes?: string;
+}
+
+export interface PlannedActivity {
+  time: string;
+  duration: number;
+  activity: Business;
+  category: 'dining' | 'attraction' | 'accommodation' | 'transportation' | 'entertainment';
+  bookingRequired: boolean;
+  bookingStatus: 'pending' | 'confirmed' | 'failed';
+}
+
+export interface TransportationPlan {
+  type: 'flight' | 'train' | 'bus' | 'car' | 'taxi' | 'walking';
+  from: Location;
+  to: Location;
+  departureTime: string;
+  arrivalTime: string;
+  cost?: number;
+  bookingInfo?: BookingInfo;
+}
+
+export interface InteractionHistoryEntry {
+  timestamp: Date;
+  type: 'suggestion_clicked' | 'business_selected' | 'booking_attempted' | 'preference_updated';
+  data: any;
 }
 
 export type ConversationStage = 
@@ -139,7 +234,11 @@ export type ConversationStage =
   | 'searching'
   | 'decision_made'
   | 'booking'
-  | 'completed';
+  | 'completed'
+  | 'travel_planning'
+  | 'itinerary_building'
+  | 'multi_category_search'
+  | 'travel_booking';
 
 // =============================================================================
 // BOOKING AND RESERVATIONS

@@ -48,6 +48,12 @@ export function useChat(): UseChatReturn {
       timeout = 30000
     } = options;
 
+    // Add user message to conversation first
+    actions.addMessage({
+      role: 'user',
+      content: message
+    });
+
     actions.setLoading(true);
     actions.setError(null);
 

@@ -8,7 +8,10 @@ import type {
   ConversationStage,
   UserPreferences,
   Location,
-  Business
+  Business,
+  TravelContext,
+  InteractionHistoryEntry,
+  TravelItinerary
 } from '@/lib/types';
 
 // =============================================================================
@@ -23,6 +26,9 @@ interface ConversationActions {
   setStage: (stage: ConversationStage) => void;
   clearConversation: () => void;
   updatePreferences: (preferences: Partial<UserPreferences>) => void;
+  updateTravelContext: (travelContext: Partial<TravelContext>) => void;
+  addInteractionHistory: (entry: Omit<InteractionHistoryEntry, 'timestamp'>) => void;
+  updateItinerary: (itinerary: Partial<TravelItinerary>) => void;
 }
 
 interface ConversationContextValue extends ConversationState {
@@ -37,7 +43,9 @@ const initialContext: ConversationContextType = {
   lastUserQuery: '',
   extractedPreferences: {},
   clarificationNeeded: false,
-  stage: 'initial'
+  stage: 'initial',
+  travelContext: undefined,
+  interactionHistory: []
 };
 
 const initialState: ConversationState = {
@@ -58,7 +66,10 @@ type ConversationAction =
   | { type: 'UPDATE_CONTEXT'; payload: Partial<ConversationContextType> }
   | { type: 'SET_STAGE'; payload: ConversationStage }
   | { type: 'CLEAR_CONVERSATION' }
-  | { type: 'UPDATE_PREFERENCES'; payload: Partial<UserPreferences> };
+  | { type: 'UPDATE_PREFERENCES'; payload: Partial<UserPreferences> }
+  | { type: 'UPDATE_TRAVEL_CONTEXT'; payload: Partial<TravelContext> }
+  | { type: 'ADD_INTERACTION_HISTORY'; payload: Omit<InteractionHistoryEntry, 'timestamp'> }
+  | { type: 'UPDATE_ITINERARY'; payload: Partial<TravelItinerary> };
 
 function conversationReducer(
   state: ConversationState,
@@ -85,6 +96,15 @@ function conversationReducer(
           ...updatedContext.extractedPreferences,
           ...extractedPrefs
         };
+
+        // Extract travel context from user message
+        const extractedTravelContext = extractTravelContextFromMessage(newMessage.content);
+        if (Object.keys(extractedTravelContext).length > 0) {
+          updatedContext.travelContext = {
+            ...updatedContext.travelContext,
+            ...extractedTravelContext
+          };
+        }
         
         // Check if user is asking for clarification or follow-up
         const isFollowUp = detectFollowUpIntent(newMessage.content, state.messages);
@@ -157,6 +177,46 @@ function conversationReducer(
           extractedPreferences: {
             ...state.context.extractedPreferences,
             ...action.payload
+          }
+        }
+      };
+
+    case 'UPDATE_TRAVEL_CONTEXT':
+      return {
+        ...state,
+        context: {
+          ...state.context,
+          travelContext: {
+            ...state.context.travelContext,
+            ...action.payload
+          }
+        }
+      };
+
+    case 'ADD_INTERACTION_HISTORY':
+      const newHistoryEntry: InteractionHistoryEntry = {
+        ...action.payload,
+        timestamp: new Date()
+      };
+      return {
+        ...state,
+        context: {
+          ...state.context,
+          interactionHistory: [...state.context.interactionHistory, newHistoryEntry]
+        }
+      };
+
+    case 'UPDATE_ITINERARY':
+      return {
+        ...state,
+        context: {
+          ...state.context,
+          travelContext: {
+            ...state.context.travelContext,
+            currentItinerary: {
+              ...state.context.travelContext?.currentItinerary,
+              ...action.payload
+            } as TravelItinerary
           }
         }
       };
@@ -236,6 +296,54 @@ function detectFollowUpIntent(message: string, previousMessages: ConversationMes
   return followUpKeywords.some(keyword => content.includes(keyword));
 }
 
+function extractTravelContextFromMessage(message: string): Partial<TravelContext> {
+  const travelContext: Partial<TravelContext> = {};
+  const content = message.toLowerCase();
+
+  // Extract travel style
+  if (content.includes('budget') || content.includes('cheap') || content.includes('backpack')) {
+    travelContext.travelStyle = 'budget';
+  } else if (content.includes('luxury') || content.includes('fancy') || content.includes('upscale')) {
+    travelContext.travelStyle = 'luxury';
+  } else if (content.includes('adventure') || content.includes('hiking') || content.includes('outdoor')) {
+    travelContext.travelStyle = 'adventure';
+  } else if (content.includes('cultural') || content.includes('museum') || content.includes('history')) {
+    travelContext.travelStyle = 'cultural';
+  } else if (content.includes('mid-range') || content.includes('moderate')) {
+    travelContext.travelStyle = 'mid-range';
+  }
+
+  // Extract group size
+  const groupSizeMatch = content.match(/(\d+)\s*(people|person|travelers|guests)/);
+  if (groupSizeMatch) {
+    travelContext.groupSize = parseInt(groupSizeMatch[1]);
+  }
+
+  // Extract interests
+  const interestKeywords = [
+    'food', 'dining', 'restaurants', 'cuisine',
+    'museums', 'art', 'culture', 'history',
+    'nightlife', 'bars', 'clubs', 'entertainment',
+    'shopping', 'markets', 'boutiques',
+    'nature', 'parks', 'hiking', 'outdoor',
+    'beaches', 'water', 'swimming',
+    'architecture', 'buildings', 'landmarks',
+    'music', 'concerts', 'shows', 'theater'
+  ];
+
+  const interests: string[] = [];
+  for (const interest of interestKeywords) {
+    if (content.includes(interest)) {
+      interests.push(interest);
+    }
+  }
+  if (interests.length > 0) {
+    travelContext.interests = interests;
+  }
+
+  return travelContext;
+}
+
 // =============================================================================
 // CONTEXT CREATION
 // =============================================================================
@@ -280,6 +388,18 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
 
     updatePreferences: (preferences) => {
       dispatch({ type: 'UPDATE_PREFERENCES', payload: preferences });
+    },
+
+    updateTravelContext: (travelContext) => {
+      dispatch({ type: 'UPDATE_TRAVEL_CONTEXT', payload: travelContext });
+    },
+
+    addInteractionHistory: (entry) => {
+      dispatch({ type: 'ADD_INTERACTION_HISTORY', payload: entry });
+    },
+
+    updateItinerary: (itinerary) => {
+      dispatch({ type: 'UPDATE_ITINERARY', payload: itinerary });
     }
   };
 
