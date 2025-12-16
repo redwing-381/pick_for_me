@@ -4,7 +4,7 @@ import { validateLocationInput } from '@/lib/location-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const query = searchParams.get('q');
 
     if (!query) {
