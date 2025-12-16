@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       // Handle case where no suitable options are found
       if (error instanceof Error && error.message.includes('No restaurants found')) {
         try {
-          decision = handleNoSuitableOptions(body.businesses, body.userPreferences);
+          decision = await handleNoSuitableOptions(body.businesses, body.userPreferences);
         } catch (fallbackError) {
           return NextResponse.json(
             { 

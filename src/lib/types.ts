@@ -218,10 +218,7 @@ export interface UIState {
 
 export interface YelpAIRequest {
   messages: YelpAIMessage[];
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
+  location?: Location;
   user_id?: string;
   session_id?: string;
 }

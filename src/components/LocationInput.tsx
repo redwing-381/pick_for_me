@@ -252,7 +252,7 @@ export default function LocationInput({
                 value={manualInput}
                 onChange={(e) => handleManualInput(e.target.value)}
                 placeholder="Enter city, address, or zip code"
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
               />
               <button
                 type="submit"

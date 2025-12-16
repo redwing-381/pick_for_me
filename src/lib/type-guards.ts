@@ -206,3 +206,20 @@ export function generateMessageId(): string {
 export function generateBookingId(): string {
   return `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
+
+// =============================================================================
+// CONTACT INFO TYPE GUARDS
+// =============================================================================
+
+export function isValidContactInfo(contact: unknown): contact is import('./types').ContactInfo {
+  return (
+    typeof contact === 'object' &&
+    contact !== null &&
+    typeof (contact as any).name === 'string' &&
+    (contact as any).name.trim().length > 0 &&
+    typeof (contact as any).phone === 'string' &&
+    validatePhoneNumber((contact as any).phone) &&
+    typeof (contact as any).email === 'string' &&
+    validateEmail((contact as any).email)
+  );
+}

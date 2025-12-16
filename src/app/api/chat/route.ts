@@ -141,7 +141,14 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!body.message || typeof body.message !== 'string') {
       return NextResponse.json(
-        { error: 'Message is required and must be a string' },
+        { 
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Message is required and must be a string',
+            retryable: false
+          }
+        },
         { status: 400 }
       );
     }
@@ -149,7 +156,14 @@ export async function POST(request: NextRequest) {
     // Validate location if provided
     if (body.location && !isValidLocation(body.location)) {
       return NextResponse.json(
-        { error: 'Invalid location format' },
+        { 
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid location format',
+            retryable: false
+          }
+        },
         { status: 400 }
       );
     }
@@ -275,12 +289,53 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Chat API error:', error);
     
+    // Determine error type and provide appropriate response
+    let errorCode = 'SERVER_ERROR';
+    let statusCode = 500;
+    let userMessage = 'An unexpected error occurred while processing your request';
+    let retryable = true;
+
+    if (error instanceof SyntaxError) {
+      errorCode = 'VALIDATION_ERROR';
+      statusCode = 400;
+      userMessage = 'Invalid request format';
+      retryable = false;
+    } else if (error && typeof error === 'object' && 'status' in error) {
+      const apiError = error as any;
+      if (apiError.status === 429) {
+        errorCode = 'RATE_LIMIT_ERROR';
+        statusCode = 429;
+        userMessage = 'Too many requests. Please wait a moment and try again.';
+        retryable = true;
+      } else if (apiError.status === 401) {
+        errorCode = 'AUTHENTICATION_ERROR';
+        statusCode = 401;
+        userMessage = 'Authentication failed. Please try again.';
+        retryable = false;
+      } else if (apiError.status >= 500) {
+        errorCode = 'SERVER_ERROR';
+        statusCode = 503;
+        userMessage = 'Service temporarily unavailable. Please try again.';
+        retryable = true;
+      }
+    } else if (error instanceof Error && error.message.includes('fetch')) {
+      errorCode = 'NETWORK_ERROR';
+      statusCode = 503;
+      userMessage = 'Network error. Please check your connection and try again.';
+      retryable = true;
+    }
+    
     return NextResponse.json(
       { 
-        error: 'Internal server error',
-        message: 'An unexpected error occurred while processing your request'
+        success: false,
+        error: {
+          code: errorCode,
+          message: userMessage,
+          retryable,
+          timestamp: new Date().toISOString()
+        }
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }

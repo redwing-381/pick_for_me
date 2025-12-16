@@ -33,9 +33,43 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Geocoding error:', error);
+    
+    let errorCode = 'LOCATION_ERROR';
+    let statusCode = 500;
+    let userMessage = 'Failed to find location. Please try a different address.';
+    let retryable = true;
+
+    if (error instanceof Error && error.message.includes('fetch')) {
+      errorCode = 'NETWORK_ERROR';
+      statusCode = 503;
+      userMessage = 'Network error. Please check your connection and try again.';
+      retryable = true;
+    } else if (error && typeof error === 'object' && 'status' in error) {
+      const apiError = error as any;
+      if (apiError.status === 404) {
+        errorCode = 'NOT_FOUND_ERROR';
+        statusCode = 404;
+        userMessage = 'Address not found. Please try a different address.';
+        retryable = false;
+      } else if (apiError.status === 429) {
+        errorCode = 'RATE_LIMIT_ERROR';
+        statusCode = 429;
+        userMessage = 'Too many location requests. Please wait a moment and try again.';
+        retryable = true;
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Failed to geocode location' },
-      { status: 500 }
+      { 
+        success: false,
+        error: {
+          code: errorCode,
+          message: userMessage,
+          retryable,
+          timestamp: new Date().toISOString()
+        }
+      },
+      { status: statusCode }
     );
   }
 }

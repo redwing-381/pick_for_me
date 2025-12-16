@@ -235,13 +235,79 @@ export class YelpAPIClient {
   // =============================================================================
 
   async chatWithAI(request: YelpAIRequest): Promise<ApiResponse<YelpAIResponse>> {
-    return this.makeRequest<YelpAIResponse>(
+    // Convert our format to Yelp AI API format
+    const lastMessage = request.messages[request.messages.length - 1];
+    
+    // Format location for Yelp AI API
+    let locationString = '';
+    if (request.location) {
+      if (request.location.address) {
+        locationString = request.location.address;
+      } else if (request.location.city && request.location.state) {
+        locationString = `${request.location.city}, ${request.location.state}`;
+      } else if (request.location.latitude && request.location.longitude) {
+        locationString = `${request.location.latitude},${request.location.longitude}`;
+      }
+    }
+    
+    const yelpRequest = {
+      query: lastMessage.content + (locationString ? ` near ${locationString}` : ''),
+      location: locationString || undefined
+    };
+
+    const response = await this.makeRequest<any>(
       YELP_API_CONFIG.AI_ENDPOINT,
       {
         method: 'POST',
-        body: JSON.stringify(request),
+        body: JSON.stringify(yelpRequest),
       }
     );
+
+    if (!response.success) {
+      return response;
+    }
+
+    // Convert Yelp AI response to our format
+    const yelpData = response.data;
+    const businesses = yelpData.entities?.[0]?.businesses?.map((biz: any) => ({
+      id: biz.id,
+      name: biz.name,
+      rating: biz.rating,
+      review_count: biz.review_count,
+      price: biz.price || '$',
+      categories: biz.categories || [],
+      location: {
+        address1: biz.location.address1,
+        address2: biz.location.address2,
+        city: biz.location.city,
+        state: biz.location.state,
+        zip_code: biz.location.zip_code,
+        country: biz.location.country,
+        display_address: biz.location.formatted_address?.split('\n') || []
+      },
+      coordinates: biz.coordinates,
+      photos: biz.contextual_info?.photos?.map((p: any) => p.original_url) || [],
+      phone: biz.phone || '',
+      display_phone: biz.phone || '',
+      url: biz.url,
+      image_url: biz.contextual_info?.photos?.[0]?.original_url || '',
+      is_closed: false,
+      transactions: biz.contextual_info?.accepts_reservations_through_yelp ? ['restaurant_reservation'] : [],
+      reservationUrl: biz.contextual_info?.accepts_reservations_through_yelp ? biz.url : undefined
+    })) || [];
+
+    const convertedResponse: YelpAIResponse = {
+      message: yelpData.response?.text || 'I found some great options for you!',
+      businesses,
+      suggested_actions: ['Make a reservation', 'Get directions', 'View menu'],
+      requires_clarification: false,
+      timestamp: new Date().toISOString()
+    };
+
+    return {
+      success: true,
+      data: convertedResponse
+    };
   }
 
   // =============================================================================
@@ -399,10 +465,7 @@ export function createYelpAIRequest(
   };
 
   if (location) {
-    request.location = {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    };
+    request.location = location;
   }
 
   return request;

@@ -342,10 +342,10 @@ export class DecisionEngine {
 /**
  * Handle cases where no suitable options are found
  */
-export function handleNoSuitableOptions(
+export async function handleNoSuitableOptions(
   businesses: Business[],
   preferences: UserPreferences
-): DecisionResponse {
+): Promise<DecisionResponse> {
   // If we have businesses but none are "suitable", still pick the best one
   if (businesses.length > 0) {
     const engine = DecisionEngine.getInstance();
@@ -358,7 +358,7 @@ export function handleNoSuitableOptions(
       state: 'Unknown'
     };
 
-    return engine.selectBestRestaurant({
+    return await engine.selectBestRestaurant({
       businesses,
       userPreferences: preferences,
       location: defaultLocation

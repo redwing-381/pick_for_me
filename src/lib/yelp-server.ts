@@ -36,7 +36,10 @@ export function createMockYelpAIResponse(
   userMessage: string,
   location?: Location
 ): YelpAIResponse {
-  // Mock business data
+  console.log('🎭 Creating mock response for:', userMessage);
+  console.log('📍 Using location:', location?.address || 'No location provided');
+  
+  // Mock business data - location-aware
   const mockBusinesses: Business[] = [
     {
       id: 'mock-restaurant-1',
@@ -134,12 +137,16 @@ export function createMockYelpAIResponse(
     }
   ];
 
-  // Generate response based on user message
-  let responseMessage = "I found some great options for you! ";
+  // Generate response based on user message and location
+  let responseMessage = location 
+    ? `I found some great options near ${location.city || location.address}! ` 
+    : "I found some great options for you! ";
   let selectedBusinesses = mockBusinesses;
 
   if (userMessage.toLowerCase().includes('italian')) {
-    responseMessage = "I found some excellent Italian restaurants for you! ";
+    responseMessage = location 
+      ? `I found some excellent Italian restaurants near ${location.city || location.address}! ` 
+      : "I found some excellent Italian restaurants for you! ";
     selectedBusinesses = mockBusinesses.map(b => ({
       ...b,
       categories: [{ alias: 'italian', title: 'Italian' }],
@@ -153,8 +160,12 @@ export function createMockYelpAIResponse(
     selectedBusinesses = mockBusinesses.map(b => ({ ...b, price: '$$$' as const }));
   }
 
+  const locationContext = location 
+    ? ` The closest option is ${selectedBusinesses[0].name}, just ${selectedBusinesses[0].distance} miles away.`
+    : '';
+
   return {
-    message: responseMessage + "Based on your preferences, I'd recommend " + selectedBusinesses[0].name + ". It has excellent reviews and fits what you're looking for perfectly!",
+    message: responseMessage + "Based on your preferences" + (location ? ` and location in ${location.city || location.address}` : '') + ", I'd recommend " + selectedBusinesses[0].name + ". It has excellent reviews and fits what you're looking for perfectly!" + locationContext,
     businesses: selectedBusinesses,
     reservation_info: {
       available_times: ['18:00', '18:30', '19:00', '19:30', '20:00', '20:30'],
@@ -175,7 +186,8 @@ export function isDevelopmentMode(): boolean {
 }
 
 export function shouldUseMockData(): boolean {
-  return isDevelopmentMode() && !process.env.YELP_API_KEY;
+  // Only use mock data if no API key is provided
+  return !process.env.YELP_API_KEY || process.env.YELP_API_KEY === 'your_yelp_api_key_here';
 }
 
 // =============================================================================

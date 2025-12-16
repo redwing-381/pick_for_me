@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useConversation } from '@/contexts/ConversationContext';
+import { useChat } from '@/hooks/useChat';
 import RestaurantCard from '@/components/RestaurantCard';
 import type { Location, UserPreferences, Business } from '@/lib/types';
 
@@ -22,7 +23,8 @@ export default function ChatInterface({
   onBusinessSelected,
   className = ''
 }: ChatInterfaceProps) {
-  const { messages, isLoading, error, actions } = useConversation();
+  const { messages } = useConversation();
+  const { sendMessage, isLoading, error, retry, clearError } = useChat();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,14 +45,17 @@ export default function ChatInterface({
     const userMessage = inputValue.trim();
     setInputValue('');
 
-    // Add user message to conversation
-    actions.addMessage({
-      role: 'user',
-      content: userMessage
-    });
-
-    // Set loading state
-    actions.setLoading(true);
+    try {
+      await sendMessage(userMessage, {
+        location,
+        userPreferences,
+        retryOnFailure: true,
+        maxRetries: 3
+      });
+    } catch (error) {
+      // Error is already handled by the useChat hook
+      console.error('Failed to send message:', error);
+    }
 
     try {
       // Prepare request payload
@@ -82,17 +87,7 @@ export default function ChatInterface({
       }
 
       if (result.success && result.data) {
-        // Add assistant response to conversation
-        actions.addMessage({
-          role: 'assistant',
-          content: result.data.message,
-          businesses: result.data.businesses,
-          metadata: {
-            suggested_actions: result.data.suggested_actions,
-            requires_clarification: result.data.requires_clarification
-          }
-        });
-
+        // Response is handled by useChat hook
         // If there's a selected business, notify parent
         if (result.data.businesses?.length > 0 && onBusinessSelected) {
           onBusinessSelected(result.data.businesses[0]);
@@ -102,11 +97,9 @@ export default function ChatInterface({
       }
     } catch (error) {
       console.error('Chat error:', error);
-      actions.setError(
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      );
+      // Error is handled by useChat hook
     } finally {
-      actions.setLoading(false);
+      // Loading state is handled by useChat hook
     }
   };
 
@@ -164,7 +157,7 @@ export default function ChatInterface({
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b bg-gray-50 rounded-t-lg">
         <h2 className="text-lg font-semibold text-gray-900">Pick For Me</h2>
-        <p className="text-sm text-gray-600">Tell me what you're craving, and I'll pick the perfect spot!</p>
+        <p className="text-sm text-gray-600">Tell me what you&apos;re craving, and I&apos;ll pick the perfect spot!</p>
       </div>
 
       {/* Messages Area */}
@@ -177,7 +170,7 @@ export default function ChatInterface({
               </svg>
             </div>
             <p className="text-gray-600 mb-2">Start a conversation!</p>
-            <p className="text-sm text-gray-500">Try: "Find me a good Italian restaurant nearby"</p>
+            <p className="text-sm text-gray-500">Try: &ldquo;Find me a good Italian restaurant nearby&rdquo;</p>
           </div>
         )}
 
@@ -218,7 +211,7 @@ export default function ChatInterface({
                   <p className="text-xs text-yellow-800 font-medium mb-2">I need a bit more info to help you better:</p>
                   <div className="space-y-1">
                     {/* This would show individual clarification questions if available */}
-                    <p className="text-xs text-yellow-700">Feel free to be more specific about what you're looking for!</p>
+                    <p className="text-xs text-yellow-700">Feel free to be more specific about what you&apos;re looking for!</p>
                   </div>
                 </div>
               )}
@@ -268,19 +261,30 @@ export default function ChatInterface({
         {/* Error message */}
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg text-sm">
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm max-w-md">
+              <div className="flex items-start space-x-3">
+                <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>{error}</span>
+                <div className="flex-1">
+                  <p className="font-medium mb-1">Something went wrong</p>
+                  <p className="text-red-700 mb-3">{error}</p>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={retry}
+                      className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={clearError}
+                      className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => actions.setError(null)}
-                className="ml-2 text-red-600 hover:text-red-800"
-              >
-                ×
-              </button>
             </div>
           </div>
         )}
@@ -297,8 +301,8 @@ export default function ChatInterface({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Tell me what you're looking for..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Tell me what you&apos;re looking for..."
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
             disabled={isLoading}
           />
           <button
