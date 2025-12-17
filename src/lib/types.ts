@@ -11,11 +11,14 @@ export interface User {
 }
 
 export interface UserPreferences {
-  cuisineTypes: string[];
-  priceRange: PriceRange;
-  dietaryRestrictions: string[];
-  atmosphere: string;
-  partySize: number;
+  cuisineTypes?: string[];
+  cuisinePreferences?: string[]; // Alias for cuisineTypes
+  priceRange?: PriceRange;
+  dietaryRestrictions?: string[];
+  atmosphere?: string;
+  ambiance?: string[]; // Multiple ambiance preferences
+  partySize?: number;
+  distance?: number; // Max distance willing to travel
 }
 
 export type PriceRange = '$' | '$$' | '$$$' | '$$$$';

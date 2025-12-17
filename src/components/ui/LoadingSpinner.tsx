@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
+import { Progress } from './progress';
 
 export interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -86,15 +87,30 @@ const LoadingCard: React.FC<LoadingCardProps> = ({
   variant = 'default',
   className
 }) => {
+  const [progress, setProgress] = useState(13);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 90) return 13; // Reset to start
+        return prev + Math.random() * 15;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className={cn(
       'bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-8 text-center max-w-md mx-auto',
       className
     )}>
-      <LoadingSpinner size={size} variant={variant} label="" />
-      <h3 className="text-xl font-bold text-black mt-4 mb-2">
+      <div className="w-16 h-16 bg-yellow-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mx-auto mb-4 flex items-center justify-center animate-bounce">
+        <span className="text-black font-black text-2xl">🤖</span>
+      </div>
+      <h3 className="text-xl font-bold text-black mt-4 mb-4">
         {title}
       </h3>
+      <Progress value={progress} className="w-full mb-4" />
       <p className="text-gray-600 font-medium">
         {description}
       </p>

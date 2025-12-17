@@ -1,178 +1,74 @@
-// Session storage utilities for authentication
+// Minimal storage utilities for session management
 import { UserProfile } from '../types/auth';
 
-const STORAGE_KEYS = {
-  USER_SESSION: 'firebase_auth_user_session',
-  REMEMBER_ME: 'firebase_auth_remember_me',
-  LAST_LOGIN: 'firebase_auth_last_login',
-} as const;
+interface StoredSession {
+  user: UserProfile;
+  rememberMe: boolean;
+  timestamp: number;
+}
 
-/**
- * Check if localStorage is available
- */
-function isStorageAvailable(): boolean {
+const SESSION_KEY = 'auth_session';
+
+export function storeUserSession(user: UserProfile, rememberMe: boolean): boolean {
   try {
-    const test = '__storage_test__';
-    localStorage.setItem(test, test);
-    localStorage.removeItem(test);
+    const session: StoredSession = {
+      user,
+      rememberMe,
+      timestamp: Date.now()
+    };
+    
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem(SESSION_KEY, JSON.stringify(session));
     return true;
-  } catch {
+  } catch (error) {
+    console.error('Failed to store session:', error);
     return false;
   }
 }
 
-/**
- * Safely get item from localStorage
- */
-function getStorageItem(key: string): string | null {
-  if (!isStorageAvailable()) return null;
-  
+export function getUserSession(): StoredSession | null {
   try {
-    return localStorage.getItem(key);
-  } catch {
+    // Check both storages
+    const localSession = localStorage.getItem(SESSION_KEY);
+    const sessionSession = sessionStorage.getItem(SESSION_KEY);
+    
+    const sessionData = localSession || sessionSession;
+    if (!sessionData) return null;
+    
+    return JSON.parse(sessionData) as StoredSession;
+  } catch (error) {
+    console.error('Failed to get session:', error);
     return null;
   }
 }
 
-/**
- * Safely set item in localStorage
- */
-function setStorageItem(key: string, value: string): boolean {
-  if (!isStorageAvailable()) return false;
-  
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Safely remove item from localStorage
- */
-function removeStorageItem(key: string): boolean {
-  if (!isStorageAvailable()) return false;
-  
-  try {
-    localStorage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Store user session data
- */
-export function storeUserSession(user: UserProfile, rememberMe: boolean = false): boolean {
-  const sessionData = {
-    user,
-    timestamp: Date.now(),
-    rememberMe,
-  };
-
-  const success = setStorageItem(STORAGE_KEYS.USER_SESSION, JSON.stringify(sessionData));
-  
-  if (success && rememberMe) {
-    setStorageItem(STORAGE_KEYS.REMEMBER_ME, 'true');
-    setStorageItem(STORAGE_KEYS.LAST_LOGIN, new Date().toISOString());
-  }
-
-  return success;
-}
-
-/**
- * Retrieve user session data
- */
-export function getUserSession(): { user: UserProfile; timestamp: number; rememberMe: boolean } | null {
-  const sessionData = getStorageItem(STORAGE_KEYS.USER_SESSION);
-  
-  if (!sessionData) return null;
-
-  try {
-    const parsed = JSON.parse(sessionData);
-    
-    // Check if session is expired (24 hours for regular sessions, 30 days for remember me)
-    const now = Date.now();
-    const sessionAge = now - parsed.timestamp;
-    const maxAge = parsed.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
-    
-    if (sessionAge > maxAge) {
-      clearUserSession();
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    clearUserSession();
-    return null;
-  }
-}
-
-/**
- * Clear user session data
- */
 export function clearUserSession(): void {
-  removeStorageItem(STORAGE_KEYS.USER_SESSION);
-  removeStorageItem(STORAGE_KEYS.REMEMBER_ME);
+  try {
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch (error) {
+    console.error('Failed to clear session:', error);
+  }
 }
 
-/**
- * Check if user has remember me enabled
- */
-export function hasRememberMe(): boolean {
-  return getStorageItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
-}
-
-/**
- * Get last login timestamp
- */
-export function getLastLogin(): Date | null {
-  const lastLogin = getStorageItem(STORAGE_KEYS.LAST_LOGIN);
-  return lastLogin ? new Date(lastLogin) : null;
-}
-
-/**
- * Update user session with new data
- */
-export function updateUserSession(user: UserProfile): boolean {
-  const existingSession = getUserSession();
-  
-  if (!existingSession) return false;
-
-  return storeUserSession(user, existingSession.rememberMe);
-}
-
-/**
- * Check if session is valid and not expired
- */
-export function isSessionValid(): boolean {
-  const session = getUserSession();
-  return session !== null;
-}
-
-/**
- * Cross-tab session synchronization
- */
-export function setupCrossTabSync(onSessionChange: (user: UserProfile | null) => void): () => void {
-  if (!isStorageAvailable()) return () => {};
-
+export function setupCrossTabSync(callback: (user: UserProfile | null) => void): () => void {
   const handleStorageChange = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEYS.USER_SESSION) {
-      if (event.newValue === null) {
-        // Session was cleared
-        onSessionChange(null);
+    if (event.key === SESSION_KEY) {
+      if (event.newValue) {
+        try {
+          const session = JSON.parse(event.newValue) as StoredSession;
+          callback(session.user);
+        } catch (error) {
+          console.error('Failed to parse session from storage event:', error);
+        }
       } else {
-        // Session was updated
-        const session = getUserSession();
-        onSessionChange(session?.user || null);
+        callback(null);
       }
     }
   };
-
+  
   window.addEventListener('storage', handleStorageChange);
-
+  
   return () => {
     window.removeEventListener('storage', handleStorageChange);
   };

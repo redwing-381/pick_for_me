@@ -52,7 +52,7 @@ export function AuthLayout({
               )}
               {showRegisterLink && (
                 <Link href="/register">
-                  <Button variant="primary" className="font-bold">
+                  <Button variant="default" className="font-bold bg-yellow-400 hover:bg-yellow-500">
                     Get Started
                   </Button>
                 </Link>

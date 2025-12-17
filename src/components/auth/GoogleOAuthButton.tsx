@@ -195,7 +195,7 @@ export function GoogleOAuth({
   }, [onError]);
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-4 max-w-full overflow-hidden ${className}`}>
       {showDivider && (
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -208,22 +208,22 @@ export function GoogleOAuth({
       )}
 
       {error && (
-        <div className="p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+        <div className="p-3 bg-red-50 border-2 border-red-200 rounded-lg max-w-full overflow-hidden">
           <div className="flex items-start space-x-2">
-            <svg className="w-5 h-5 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div>
-              <p className="text-sm text-red-800 font-medium">Google Sign-in Error</p>
-              <p className="text-xs text-red-700 mt-1">{error}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-red-800 font-medium break-words">Google Sign-in Error</p>
+              <p className="text-xs text-red-700 mt-1 break-words">{error}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-        <p className="text-sm text-gray-600 mb-4">{subtitle}</p>
+      <div className="text-center max-w-full overflow-hidden">
+        <h3 className="text-lg font-bold text-gray-900 mb-2 break-words">{title}</h3>
+        <p className="text-sm text-gray-600 mb-4 break-words">{subtitle}</p>
         
         <GoogleOAuthButton
           onSuccess={handleSuccess}
@@ -235,35 +235,35 @@ export function GoogleOAuth({
       </div>
 
       {/* OAuth Benefits */}
-      <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+      <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg max-w-full overflow-hidden">
         <div className="flex items-start space-x-2">
-          <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <div>
-            <p className="text-sm text-blue-800 font-medium">Secure & Convenient</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-blue-800 font-medium break-words">Secure & Convenient</p>
             <ul className="text-xs text-blue-700 mt-1 space-y-1">
-              <li>• No need to remember another password</li>
-              <li>• Protected by Google's security measures</li>
-              <li>• Quick and easy sign-in process</li>
-              <li>• Your Google password is never shared</li>
+              <li className="break-words">• No need to remember another password</li>
+              <li className="break-words">• Protected by Google's security</li>
+              <li className="break-words">• Quick and easy sign-in</li>
+              <li className="break-words">• Your password is never shared</li>
             </ul>
           </div>
         </div>
       </div>
 
       {/* Troubleshooting */}
-      <details className="mt-4">
-        <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
+      <details className="mt-4 max-w-full overflow-hidden">
+        <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800 break-words">
           Having trouble with Google sign-in?
         </summary>
-        <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700">
+        <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 max-w-full overflow-hidden">
           <ul className="space-y-1">
-            <li>• Make sure pop-ups are enabled in your browser</li>
-            <li>• Try signing out of Google and signing back in</li>
-            <li>• Clear your browser cache and cookies</li>
-            <li>• Disable browser extensions that might block authentication</li>
-            <li>• Try using an incognito/private browsing window</li>
+            <li className="break-words">• Make sure pop-ups are enabled</li>
+            <li className="break-words">• Try signing out and back in</li>
+            <li className="break-words">• Clear browser cache and cookies</li>
+            <li className="break-words">• Disable blocking extensions</li>
+            <li className="break-words">• Try incognito/private mode</li>
           </ul>
         </div>
       </details>

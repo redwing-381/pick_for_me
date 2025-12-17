@@ -172,7 +172,7 @@ export class DecisionEngine {
 
     // Price preference factor (25% weight)
     const priceWeight = 0.25;
-    const priceScore = this.calculatePriceScore(business.price, preferences.priceRange);
+    const priceScore = this.calculatePriceScore(business.price, preferences.priceRange || '$$');
     totalScore += priceScore * priceWeight;
     totalWeight += priceWeight;
 
@@ -184,7 +184,7 @@ export class DecisionEngine {
 
     // Cuisine preference factor (15% weight)
     const cuisineWeight = 0.15;
-    const cuisineScore = this.calculateCuisineScore(business.categories, preferences.cuisineTypes);
+    const cuisineScore = this.calculateCuisineScore(business.categories, preferences.cuisineTypes || []);
     totalScore += cuisineScore * cuisineWeight;
     totalWeight += cuisineWeight;
 
@@ -225,8 +225,8 @@ export class DecisionEngine {
     factors.push({
       name: 'Price Match',
       weight: 0.25,
-      score: this.calculatePriceScore(business.price, preferences.priceRange),
-      description: `${business.price} price range (preference: ${preferences.priceRange})`
+      score: this.calculatePriceScore(business.price, preferences.priceRange || '$$'),
+      description: `${business.price} price range (preference: ${preferences.priceRange || '$$'})`
     });
 
     // Distance factor
@@ -241,7 +241,7 @@ export class DecisionEngine {
     factors.push({
       name: 'Cuisine Match',
       weight: 0.15,
-      score: this.calculateCuisineScore(business.categories, preferences.cuisineTypes),
+      score: this.calculateCuisineScore(business.categories, preferences.cuisineTypes || []),
       description: `Serves ${business.categories.map(c => c.title).join(', ')}`
     });
 
@@ -840,7 +840,7 @@ export class DecisionEngine {
 
     // Price factor (20% weight)
     const priceWeight = 0.2;
-    const priceScore = this.calculatePriceScore(business.price, preferences.priceRange);
+    const priceScore = this.calculatePriceScore(business.price, preferences.priceRange || '$$');
     totalScore += priceScore * priceWeight;
     totalWeight += priceWeight;
 
@@ -881,7 +881,7 @@ export class DecisionEngine {
       {
         name: 'Price',
         weight: 0.2,
-        score: this.calculatePriceScore(business.price, preferences.priceRange),
+        score: this.calculatePriceScore(business.price, preferences.priceRange || '$$'),
         description: `${business.price} pricing fits your budget`
       },
       {

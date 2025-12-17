@@ -516,7 +516,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
 
         // Set up cross-tab session synchronization
-        unsubscribeCrossTab = setupCrossTabSync((user) => {
+        unsubscribeCrossTab = setupCrossTabSync((user: any) => {
           dispatch({ type: 'SET_USER', payload: user });
         });
 

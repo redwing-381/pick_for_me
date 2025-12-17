@@ -95,16 +95,20 @@ export function isValidPriceRange(price: unknown): price is PriceRange {
 }
 
 export function isValidUserPreferences(preferences: unknown): preferences is UserPreferences {
+  if (typeof preferences !== 'object' || preferences === null) {
+    return false;
+  }
+  
+  const pref = preferences as UserPreferences;
+  
   return (
-    typeof preferences === 'object' &&
-    preferences !== null &&
-    Array.isArray((preferences as UserPreferences).cuisineTypes) &&
-    Array.isArray((preferences as UserPreferences).dietaryRestrictions) &&
-    typeof (preferences as UserPreferences).atmosphere === 'string' &&
-    typeof (preferences as UserPreferences).partySize === 'number' &&
-    (preferences as UserPreferences).partySize > 0 &&
-    (preferences as UserPreferences).partySize <= 20 &&
-    isValidPriceRange((preferences as UserPreferences).priceRange)
+    Array.isArray(pref.cuisineTypes) &&
+    Array.isArray(pref.dietaryRestrictions) &&
+    typeof pref.atmosphere === 'string' &&
+    typeof pref.partySize === 'number' &&
+    pref.partySize > 0 &&
+    pref.partySize <= 20 &&
+    isValidPriceRange(pref.priceRange)
   );
 }
 

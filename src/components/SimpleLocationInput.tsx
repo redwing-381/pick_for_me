@@ -41,28 +41,31 @@ export default function SimpleLocationInput({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-teal-400 border-2 border-black flex items-center justify-center">
-            <span className="text-black text-sm">📍</span>
+            <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
           </div>
           <div>
-            <p className="text-sm font-black text-black">Location</p>
+            <p className="text-sm font-black text-black">LOCATION</p>
             <p className="text-xs font-bold text-gray-700">{currentLocation.city}</p>
           </div>
         </div>
         <button
           onClick={() => setIsEditing(true)}
-          className="px-3 py-1 bg-white text-black text-sm font-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+          className="px-4 py-2 bg-white text-black text-sm font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all"
         >
-          Change
+          CHANGE
         </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-black text-black mb-2">
-          Enter Your City
+          ENTER YOUR CITY
         </label>
         <input
           type="text"
@@ -73,17 +76,17 @@ export default function SimpleLocationInput({
           autoFocus
         />
         <p className="text-xs font-bold text-gray-600 mt-2">
-          💡 Just type your city name - we'll use it for all recommendations
+          Just type your city name - we'll use it for all recommendations
         </p>
       </div>
       
-      <div className="flex space-x-2">
+      <div className="flex gap-3">
         <button
           type="submit"
           disabled={!cityInput.trim()}
           className="flex-1 px-6 py-3 bg-teal-400 text-black font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] active:shadow-none active:translate-x-1 active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none transition-all"
         >
-          Set Location
+          SET LOCATION
         </button>
         {currentLocation && (
           <button
@@ -91,7 +94,7 @@ export default function SimpleLocationInput({
             onClick={() => setIsEditing(false)}
             className="px-6 py-3 bg-white text-black font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all"
           >
-            Cancel
+            CANCEL
           </button>
         )}
       </div>

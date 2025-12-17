@@ -142,41 +142,41 @@ export function LogoutButton({
         )}
       </button>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog - Neo-Brutalism Style */}
       {showConfirmDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 max-w-md w-full mx-4">
+          <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 max-w-md w-full mx-4">
             <div className="text-center">
-              <div className="mx-auto w-12 h-12 bg-yellow-100 border-4 border-black rounded-full flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              <div className="mx-auto w-16 h-16 bg-yellow-400 border-4 border-black flex items-center justify-center mb-6">
+                <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
               
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Sign Out</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-2xl font-black text-black mb-3">CONFIRM SIGN OUT</h3>
+              <p className="text-gray-700 font-bold mb-8">
                 Are you sure you want to sign out? You'll need to sign in again to access your account.
               </p>
               
-              <div className="flex space-x-3">
+              <div className="flex gap-4">
                 <button
                   type="button"
                   onClick={cancelLogout}
-                  className="flex-1 py-2 px-4 font-bold border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all bg-white hover:bg-gray-50 text-black hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px]"
+                  className="flex-1 py-3 px-6 font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all bg-white hover:bg-gray-50 text-black hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px]"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="button"
                   onClick={performLogout}
                   disabled={isLoggingOut}
-                  className={`flex-1 py-2 px-4 font-bold border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
+                  className={`flex-1 py-3 px-6 font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all ${
                     isLoggingOut
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-red-400 hover:bg-red-500 text-white hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px]'
+                      : 'bg-red-400 hover:bg-red-500 text-black hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px]'
                   }`}
                 >
-                  {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
+                  {isLoggingOut ? 'SIGNING OUT...' : 'SIGN OUT'}
                 </button>
               </div>
             </div>
