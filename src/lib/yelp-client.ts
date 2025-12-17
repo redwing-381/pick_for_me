@@ -8,6 +8,7 @@ import type {
   ApiResponse 
 } from './types';
 import { YELP_API_CONFIG, ERROR_MESSAGES } from './constants';
+import { getMockTravelData } from './travel-mock-data';
 
 // =============================================================================
 // TYPES AND INTERFACES
@@ -231,6 +232,143 @@ export class YelpAPIClient {
   }
 
   // =============================================================================
+  // TRAVEL QUERY SUPPORT
+  // =============================================================================
+
+  private generateMockTravelData(category: string, location: any): Business[] {
+    const locationName = location?.city || 'Unknown City';
+    
+    switch (category) {
+      case 'accommodation':
+        return [
+          {
+            id: 'hotel_mock_1',
+            name: `Grand ${locationName} Hotel`,
+            rating: 4.5,
+            review_count: 1250,
+            price: '$$$',
+            categories: [{ alias: 'hotel', title: 'Hotel' }],
+            location: {
+              address1: '123 Main Street',
+              city: locationName,
+              state: location?.state || 'State',
+              zip_code: location?.zipCode || '12345',
+              country: 'US',
+              display_address: [`123 Main Street`, `${locationName}, ${location?.state || 'State'} ${location?.zipCode || '12345'}`]
+            },
+            coordinates: {
+              latitude: location?.latitude || 40.7128,
+              longitude: location?.longitude || -74.0060
+            },
+            photos: ['https://example.com/hotel1.jpg'],
+            phone: '+1-555-0123',
+            display_phone: '(555) 012-3456',
+            url: 'https://example.com/hotel1',
+            image_url: 'https://example.com/hotel1.jpg',
+            is_closed: false,
+            transactions: ['booking_available']
+          }
+        ];
+        
+      case 'attractions':
+        return [
+          {
+            id: 'attraction_mock_1',
+            name: `${locationName} Museum of Art`,
+            rating: 4.6,
+            review_count: 2100,
+            price: '$$',
+            categories: [{ alias: 'museum', title: 'Art Museum' }],
+            location: {
+              address1: '789 Culture Blvd',
+              city: locationName,
+              state: location?.state || 'State',
+              zip_code: location?.zipCode || '12345',
+              country: 'US',
+              display_address: [`789 Culture Blvd`, `${locationName}, ${location?.state || 'State'} ${location?.zipCode || '12345'}`]
+            },
+            coordinates: {
+              latitude: (location?.latitude || 40.7128) + 0.02,
+              longitude: (location?.longitude || -74.0060) + 0.02
+            },
+            photos: ['https://example.com/museum1.jpg'],
+            phone: '+1-555-0125',
+            display_phone: '(555) 012-3458',
+            url: 'https://example.com/museum1',
+            image_url: 'https://example.com/museum1.jpg',
+            is_closed: false,
+            transactions: ['tickets_available']
+          }
+        ];
+        
+      case 'transportation':
+        return [
+          {
+            id: 'transport_mock_1',
+            name: `${locationName} International Airport`,
+            rating: 3.9,
+            review_count: 5200,
+            price: 'N/A',
+            categories: [{ alias: 'airport', title: 'Airport' }],
+            location: {
+              address1: '1 Airport Way',
+              city: locationName,
+              state: location?.state || 'State',
+              zip_code: location?.zipCode || '12345',
+              country: 'US',
+              display_address: [`1 Airport Way`, `${locationName}, ${location?.state || 'State'} ${location?.zipCode || '12345'}`]
+            },
+            coordinates: {
+              latitude: (location?.latitude || 40.7128) + 0.1,
+              longitude: (location?.longitude || -74.0060) + 0.1
+            },
+            photos: ['https://example.com/airport1.jpg'],
+            phone: '+1-555-0127',
+            display_phone: '(555) 012-3460',
+            url: 'https://example.com/airport1',
+            image_url: 'https://example.com/airport1.jpg',
+            is_closed: false,
+            transactions: ['flight_booking']
+          }
+        ];
+        
+      case 'entertainment':
+        return [
+          {
+            id: 'entertainment_mock_1',
+            name: `The ${locationName} Theater`,
+            rating: 4.7,
+            review_count: 980,
+            price: '$$$',
+            categories: [{ alias: 'theater', title: 'Theater' }],
+            location: {
+              address1: '200 Broadway',
+              city: locationName,
+              state: location?.state || 'State',
+              zip_code: location?.zipCode || '12345',
+              country: 'US',
+              display_address: [`200 Broadway`, `${locationName}, ${location?.state || 'State'} ${location?.zipCode || '12345'}`]
+            },
+            coordinates: {
+              latitude: (location?.latitude || 40.7128) + 0.005,
+              longitude: (location?.longitude || -74.0060) - 0.005
+            },
+            photos: ['https://example.com/theater1.jpg'],
+            phone: '+1-555-0129',
+            display_phone: '(555) 012-3462',
+            url: 'https://example.com/theater1',
+            image_url: 'https://example.com/theater1.jpg',
+            is_closed: false,
+            transactions: ['show_tickets']
+          }
+        ];
+        
+      default:
+        return [];
+    }
+  }
+
+  // =============================================================================
   // YELP AI API METHODS
   // =============================================================================
 
@@ -307,6 +445,201 @@ export class YelpAPIClient {
     return {
       success: true,
       data: convertedResponse
+    };
+  }
+
+  async handleTravelQuery(
+    query: string, 
+    category: string, 
+    location?: Location
+  ): Promise<ApiResponse<YelpAIResponse>> {
+    // For non-dining queries, use enhanced mock data system
+    // In a real implementation, this would integrate with various travel APIs
+    
+    if (category === 'dining') {
+      // Use regular Yelp AI API for dining queries
+      return this.chatWithAI({
+        messages: [{ role: 'user', content: query }],
+        location
+      });
+    }
+    
+    // Use enhanced mock data system for other travel categories
+    const mockBusinesses = this.getEnhancedMockTravelData(category, location, query);
+    const locationName = location?.city || 'your area';
+    
+    let responseMessage = '';
+    let suggestedActions: string[] = [];
+    
+    switch (category) {
+      case 'accommodation':
+        responseMessage = `I found some great accommodation options in ${locationName}!`;
+        suggestedActions = ['Check availability', 'Compare prices', 'See amenities', 'Book now'];
+        break;
+      case 'attractions':
+        responseMessage = `Here are some amazing attractions to explore in ${locationName}!`;
+        suggestedActions = ['Get tickets', 'Check hours', 'Plan visit', 'See more attractions'];
+        break;
+      case 'transportation':
+        responseMessage = `Here are transportation options in ${locationName}!`;
+        suggestedActions = ['Check schedules', 'Book tickets', 'Get directions', 'Compare prices'];
+        break;
+      case 'entertainment':
+        responseMessage = `I found some great entertainment options in ${locationName}!`;
+        suggestedActions = ['Get tickets', 'Check showtimes', 'See upcoming events', 'Make reservations'];
+        break;
+      default:
+        responseMessage = `Here are some travel options in ${locationName}!`;
+        suggestedActions = ['Learn more', 'Get directions', 'Check availability', 'Plan visit'];
+    }
+    
+    const travelResponse: YelpAIResponse = {
+      message: responseMessage,
+      businesses: mockBusinesses,
+      suggested_actions: suggestedActions,
+      requires_clarification: false,
+      timestamp: new Date().toISOString()
+    };
+    
+    return {
+      success: true,
+      data: travelResponse
+    };
+  }
+
+  // Enhanced mock data integration
+  private getEnhancedMockTravelData(category: string, location?: Location, query?: string): Business[] {
+    // Map category names to our enhanced system
+    const categoryMap: Record<string, string> = {
+      'accommodation': 'hotels',
+      'attractions': 'attractions',
+      'transportation': 'transportation',
+      'entertainment': 'attractions', // Entertainment is part of attractions
+      'dining': 'dining'
+    };
+    
+    const mappedCategory = categoryMap[category] || 'hotels';
+    
+    // Extract filters from query if possible
+    const filters: any = {};
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      
+      // Price range detection
+      if (lowerQuery.includes('budget') || lowerQuery.includes('cheap')) {
+        filters.priceRange = '$';
+      } else if (lowerQuery.includes('luxury') || lowerQuery.includes('expensive')) {
+        filters.priceRange = '$$$$';
+      } else if (lowerQuery.includes('mid-range') || lowerQuery.includes('moderate')) {
+        filters.priceRange = '$$';
+      }
+      
+      // Rating detection
+      if (lowerQuery.includes('highly rated') || lowerQuery.includes('best')) {
+        filters.rating = 4.0;
+      }
+      
+      // Amenity detection
+      const amenityKeywords = ['pool', 'gym', 'wifi', 'parking', 'restaurant', 'spa'];
+      const detectedAmenities = amenityKeywords.filter(amenity => lowerQuery.includes(amenity));
+      if (detectedAmenities.length > 0) {
+        filters.amenities = detectedAmenities;
+      }
+    }
+    
+    const mockBusinesses = getMockTravelData(mappedCategory as any, location, filters);
+    
+    // Convert enhanced mock businesses to standard Business format
+    return mockBusinesses.map((business: any) => ({
+      id: business.id,
+      name: business.name,
+      rating: business.rating,
+      review_count: business.review_count,
+      price: business.price,
+      categories: business.categories,
+      location: business.location,
+      coordinates: business.coordinates,
+      photos: business.photos,
+      phone: business.phone,
+      display_phone: business.display_phone,
+      url: business.url,
+      image_url: business.image_url,
+      is_closed: business.is_closed,
+      transactions: business.transactions,
+      reservationUrl: business.reservationUrl
+    }));
+  }
+
+  // =============================================================================
+  // TRAVEL-SPECIFIC SEARCH METHODS
+  // =============================================================================
+
+  async searchAccommodations(params: YelpSearchParams & {
+    accommodationType?: 'hotel' | 'hostel' | 'vacation_rental' | 'resort';
+    priceRange?: 'budget' | 'mid-range' | 'luxury';
+  }): Promise<ApiResponse<{ businesses: Business[] }>> {
+    // For now, return mock data
+    // In a real implementation, this would integrate with hotel booking APIs
+    const mockData = this.generateMockTravelData('accommodation', {
+      city: params.location,
+      latitude: params.latitude,
+      longitude: params.longitude
+    });
+    
+    return {
+      success: true,
+      data: { businesses: mockData }
+    };
+  }
+
+  async searchAttractions(params: YelpSearchParams & {
+    attractionType?: 'museum' | 'park' | 'landmark' | 'entertainment';
+  }): Promise<ApiResponse<{ businesses: Business[] }>> {
+    // For now, return mock data
+    // In a real implementation, this would integrate with attraction APIs
+    const mockData = this.generateMockTravelData('attractions', {
+      city: params.location,
+      latitude: params.latitude,
+      longitude: params.longitude
+    });
+    
+    return {
+      success: true,
+      data: { businesses: mockData }
+    };
+  }
+
+  async searchTransportation(params: YelpSearchParams & {
+    transportType?: 'flight' | 'train' | 'bus' | 'local';
+  }): Promise<ApiResponse<{ businesses: Business[] }>> {
+    // For now, return mock data
+    // In a real implementation, this would integrate with transportation APIs
+    const mockData = this.generateMockTravelData('transportation', {
+      city: params.location,
+      latitude: params.latitude,
+      longitude: params.longitude
+    });
+    
+    return {
+      success: true,
+      data: { businesses: mockData }
+    };
+  }
+
+  async searchEntertainment(params: YelpSearchParams & {
+    entertainmentType?: 'theater' | 'music' | 'nightlife' | 'events';
+  }): Promise<ApiResponse<{ businesses: Business[] }>> {
+    // For now, return mock data
+    // In a real implementation, this would integrate with entertainment APIs
+    const mockData = this.generateMockTravelData('entertainment', {
+      city: params.location,
+      latitude: params.latitude,
+      longitude: params.longitude
+    });
+    
+    return {
+      success: true,
+      data: { businesses: mockData }
     };
   }
 
@@ -423,6 +756,52 @@ export function getYelpClient(): YelpAPIClient {
   }
   
   return yelpClientInstance;
+}
+
+// =============================================================================
+// TRAVEL QUERY HELPERS
+// =============================================================================
+
+export function categorizeTravelQuery(query: string): {
+  category: 'dining' | 'accommodation' | 'attractions' | 'transportation' | 'entertainment' | 'general';
+  confidence: number;
+} {
+  const content = query.toLowerCase();
+  
+  // Accommodation keywords
+  if (content.includes('hotel') || content.includes('accommodation') || content.includes('stay') || 
+      content.includes('lodge') || content.includes('resort') || content.includes('airbnb')) {
+    return { category: 'accommodation', confidence: 0.9 };
+  }
+  
+  // Attraction keywords
+  if (content.includes('museum') || content.includes('attraction') || content.includes('tourist') ||
+      content.includes('sightseeing') || content.includes('landmark') || content.includes('visit') ||
+      content.includes('things to do') || content.includes('places to see')) {
+    return { category: 'attractions', confidence: 0.8 };
+  }
+  
+  // Transportation keywords
+  if (content.includes('flight') || content.includes('train') || content.includes('bus') ||
+      content.includes('transport') || content.includes('airport') || content.includes('ticket') ||
+      content.includes('how to get')) {
+    return { category: 'transportation', confidence: 0.8 };
+  }
+  
+  // Entertainment keywords
+  if (content.includes('theater') || content.includes('show') || content.includes('concert') ||
+      content.includes('nightlife') || content.includes('entertainment') || content.includes('music') ||
+      content.includes('bar') || content.includes('club')) {
+    return { category: 'entertainment', confidence: 0.7 };
+  }
+  
+  // Dining keywords (existing functionality)
+  if (content.includes('restaurant') || content.includes('food') || content.includes('eat') ||
+      content.includes('dining') || content.includes('cuisine') || content.includes('meal')) {
+    return { category: 'dining', confidence: 0.9 };
+  }
+  
+  return { category: 'general', confidence: 0.3 };
 }
 
 // =============================================================================

@@ -29,6 +29,18 @@ export default function RestaurantCard({
   const [imageError, setImageError] = useState(false);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
 
+  // Early return if restaurant is not provided
+  if (!restaurant) {
+    return (
+      <div className={`bg-gray-100 rounded-lg p-4 ${className}`}>
+        <div className="text-gray-500 text-center">Restaurant information not available</div>
+      </div>
+    );
+  }
+
+  // Ensure categories exist
+  const categories = restaurant.categories || [];
+
   const handleCardClick = () => {
     if (onSelect) {
       onSelect(restaurant);
@@ -146,7 +158,7 @@ export default function RestaurantCard({
           </div>
 
           <p className="text-sm text-gray-600 mt-1">
-            {restaurant.categories.map(c => c.title).join(', ')}
+            {categories.map(c => c.title).join(', ')}
           </p>
         </div>
 
@@ -233,7 +245,7 @@ export default function RestaurantCard({
             </div>
 
             <p className="text-gray-600 mb-3">
-              {restaurant.categories.map(c => c.title).join(' • ')}
+              {categories.map(c => c.title).join(' • ')}
             </p>
           </div>
         </div>
@@ -434,7 +446,7 @@ export default function RestaurantCard({
           </div>
 
           <p className="text-sm text-gray-600">
-            {restaurant.categories.map(c => c.title).join(', ')}
+            {categories.map(c => c.title).join(', ')}
           </p>
         </div>
 

@@ -5,18 +5,21 @@ import { ConversationProvider } from '@/contexts/ConversationContext';
 import ChatInterface from '@/components/ChatInterface';
 import LocationInput from '@/components/LocationInput';
 import RestaurantCard from '@/components/RestaurantCard';
+import TravelRecommendationCard from '@/components/TravelRecommendationCard';
+import ItineraryDisplay, { ItinerarySummary } from '@/components/ItineraryDisplay';
 import BookingModal from '@/components/BookingModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { LoadingSpinner, LoadingSkeleton, LoadingOverlay } from '@/components/LoadingStates';
+import { LoadingOverlay } from '@/components/LoadingStates';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { useDebounce, useLocalStorageCache, usePerformanceMonitor } from '@/lib/performance-utils';
 import { transitions, microInteractions } from '@/lib/animations';
-import type { Location, UserPreferences, Business, BookingInfo } from '@/lib/types';
+import { getMockTravelData } from '@/lib/travel-mock-data';
+import { bookingSimulator } from '@/lib/booking-simulation';
+import type { Location, UserPreferences, Business, BookingInfo, TravelItinerary } from '@/lib/types';
 
 // Memoized components for performance
 const MemoizedChatInterface = memo(ChatInterface);
 const MemoizedLocationInput = memo(LocationInput);
-const MemoizedRestaurantCard = memo(RestaurantCard);
 
 export default function Home() {
   // Performance monitoring
@@ -27,10 +30,13 @@ export default function Home() {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [showPreferences, setShowPreferences] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingCategory, setBookingCategory] = useState<'dining' | 'accommodation' | 'attraction' | 'transportation' | 'entertainment'>('dining');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [completedBookings, setCompletedBookings] = useState<BookingInfo[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [currentItinerary, setCurrentItinerary] = useState<TravelItinerary | null>(null);
+  const [travelMode, setTravelMode] = useState<'chat' | 'itinerary'>('chat');
   
   const { handleError, clearError } = useErrorHandler({ component: 'HomePage' });
   
@@ -64,6 +70,111 @@ export default function Home() {
   const handleBusinessSelected = useCallback((business: Business) => {
     setSelectedBusiness(business);
   }, []);
+
+  // Booking completion handler (defined early to avoid hoisting issues)
+  const handleBookingComplete = useCallback((booking: BookingInfo) => {
+    setCompletedBookings(prev => [...prev, booking]);
+    setIsBookingModalOpen(false);
+    // Show success notification
+    clearError();
+  }, [clearError]);
+
+  // Enhanced travel query handler with integrated mock data
+  const handleTravelQuery = useCallback(async (query: string, category: string) => {
+    try {
+      // Use enhanced mock data system for travel queries
+      const travelData = getMockTravelData(
+        category as 'hotels' | 'attractions' | 'transportation' | 'dining',
+        location || undefined,
+        { query } // Pass query for filtering
+      );
+      
+      return travelData;
+    } catch (error) {
+      handleError(error instanceof Error ? error : new Error('Travel query failed'), 'travel-query');
+      return [];
+    }
+  }, [location, handleError]);
+
+  // Enhanced booking handler with simulation
+  const handleEnhancedBooking = useCallback(async (business: Business, bookingDetails: any) => {
+    try {
+      const bookingRequest = {
+        businessId: business.id,
+        category: bookingCategory,
+        bookingDetails,
+        userContact: {
+          name: 'User', // This would come from user profile
+          email: 'user@example.com',
+          phone: '+1-555-0123'
+        }
+      };
+
+      const result = await bookingSimulator.simulateSingleBooking(bookingRequest);
+      
+      if (result.success && result.data.success) {
+        // Handle successful booking
+        const bookingInfo: BookingInfo = {
+          confirmationId: result.data.confirmationId!,
+          restaurantName: business.name,
+          restaurantId: business.id,
+          date: bookingDetails.date || new Date().toISOString().split('T')[0],
+          time: bookingDetails.time || '7:00 PM',
+          partySize: bookingDetails.partySize || userPreferences.partySize,
+          status: 'confirmed',
+          userContact: {
+            name: 'User',
+            email: 'user@example.com',
+            phone: '+1-555-0123'
+          },
+          specialRequests: bookingDetails.specialRequests || ''
+        };
+        
+        handleBookingComplete(bookingInfo);
+        return result.data;
+      } else {
+        // Handle booking failure
+        const errorMessage = result.success ? result.data.error?.message : result.error?.message;
+        throw new Error(errorMessage || 'Booking failed');
+      }
+    } catch (error) {
+      handleError(error instanceof Error ? error : new Error('Booking failed'), 'booking');
+      throw error;
+    }
+  }, [bookingCategory, userPreferences.partySize, handleBookingComplete, handleError]);
+
+  // Itinerary generation handler
+  const handleGenerateItinerary = useCallback(async (destination: string, days: number, preferences: any) => {
+    try {
+      // This would integrate with the itinerary planner
+      const response = await fetch('/api/itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destination: location || { city: destination },
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
+          groupSize: userPreferences.partySize,
+          preferences: {
+            ...userPreferences,
+            ...preferences
+          }
+        })
+      });
+
+      if (response.ok) {
+        const itinerary = await response.json();
+        setCurrentItinerary(itinerary);
+        setTravelMode('itinerary');
+        return itinerary;
+      } else {
+        throw new Error('Failed to generate itinerary');
+      }
+    } catch (error) {
+      handleError(error instanceof Error ? error : new Error('Itinerary generation failed'), 'itinerary');
+      return null;
+    }
+  }, [location, userPreferences, handleError, setCurrentItinerary]);
 
   // Enhanced location detection with loading states and error handling
   const handleDetectLocation = useCallback(async () => {
@@ -104,17 +215,11 @@ export default function Home() {
   }, [handleError, clearError]);
 
   // Booking modal handlers
-  const handleBookingRequest = useCallback((business: Business) => {
+  const handleBookingRequest = useCallback((business: Business, category: 'dining' | 'accommodation' | 'attraction' | 'transportation' | 'entertainment' = 'dining') => {
     setSelectedBusiness(business);
+    setBookingCategory(category);
     setIsBookingModalOpen(true);
   }, []);
-
-  const handleBookingComplete = useCallback((booking: BookingInfo) => {
-    setCompletedBookings(prev => [...prev, booking]);
-    setIsBookingModalOpen(false);
-    // Show success notification
-    clearError();
-  }, [clearError]);
 
   const handleBookingClose = useCallback(() => {
     setIsBookingModalOpen(false);
@@ -179,8 +284,9 @@ export default function Home() {
     onClose: handleBookingClose,
     business: selectedBusiness!,
     onBookingComplete: handleBookingComplete,
-    initialPartySize: userPreferences.partySize
-  }), [isBookingModalOpen, handleBookingClose, selectedBusiness, handleBookingComplete, userPreferences.partySize]);
+    initialPartySize: userPreferences.partySize,
+    category: bookingCategory
+  }), [isBookingModalOpen, handleBookingClose, selectedBusiness, handleBookingComplete, userPreferences.partySize, bookingCategory]);
 
   return (
     <ErrorBoundary component="HomePage">
@@ -196,7 +302,7 @@ export default function Home() {
                   <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-lg">P</span>
                   </div>
-                  <h1 className="text-2xl font-bold text-gray-900">Pick For Me</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Travel Assistant</h1>
                 </div>
                 
                 {/* Desktop Navigation */}
@@ -315,11 +421,47 @@ export default function Home() {
           {/* Main Content */}
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-              {/* Chat Interface - Main Content */}
+              {/* Main Content Area */}
               <div className="lg:col-span-3 order-2 lg:order-1">
-                <div className={`bg-white rounded-xl shadow-lg overflow-hidden ${transitions.shadow} ${microInteractions.cardHover}`}>
-                  <MemoizedChatInterface {...memoizedChatProps} />
-                </div>
+                {travelMode === 'chat' ? (
+                  <div className={`bg-white rounded-xl shadow-lg overflow-hidden ${transitions.shadow} ${microInteractions.cardHover}`}>
+                    <MemoizedChatInterface {...memoizedChatProps} />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {currentItinerary ? (
+                      <>
+                        <ItinerarySummary itinerary={currentItinerary} />
+                        <ItineraryDisplay 
+                          itinerary={currentItinerary}
+                          onActivitySelect={(activity) => {
+                            setSelectedBusiness(activity.activity);
+                          }}
+                          onModifyDay={(dayIndex) => {
+                            // Handle day modification
+                            console.log('Modify day:', dayIndex);
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+                        <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">No Itinerary Yet</h3>
+                        <p className="text-gray-600 mb-6">
+                          Switch to Chat Mode and ask me to plan a multi-day trip to get started!
+                        </p>
+                        <button
+                          onClick={() => setTravelMode('chat')}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Start Planning
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Sidebar - Secondary Content */}
@@ -435,7 +577,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Selected Business - Enhanced with RestaurantCard */}
+                {/* Selected Business - Enhanced with Travel Cards */}
                 {selectedBusiness && (
                   <div className={`bg-white rounded-xl shadow-lg overflow-hidden ${transitions.normal} ${microInteractions.cardHover}`}>
                     <div className="p-4 border-b bg-gray-50">
@@ -443,20 +585,110 @@ export default function Home() {
                         <svg className={`w-5 h-5 mr-2 text-green-600 ${microInteractions.iconHover}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Your Pick
+                        Your Selection
                       </h3>
                     </div>
                     <div className="p-0">
-                      <MemoizedRestaurantCard
-                        restaurant={selectedBusiness}
-                        variant="compact"
-                        onBook={handleBookingRequest}
-                        showBookingButton={true}
-                        className="border-0 shadow-none rounded-none"
-                      />
+                      {/* Determine category based on business categories */}
+                      {(() => {
+                        const categories = (selectedBusiness.categories || []).map(c => c.alias.toLowerCase());
+                        let category: 'dining' | 'accommodation' | 'attraction' | 'transportation' | 'entertainment' = 'dining';
+                        
+                        if (categories.some(c => c.includes('hotel') || c.includes('accommodation'))) {
+                          category = 'accommodation';
+                        } else if (categories.some(c => c.includes('museum') || c.includes('attraction') || c.includes('park'))) {
+                          category = 'attraction';
+                        } else if (categories.some(c => c.includes('airport') || c.includes('transport') || c.includes('station'))) {
+                          category = 'transportation';
+                        } else if (categories.some(c => c.includes('theater') || c.includes('entertainment') || c.includes('music'))) {
+                          category = 'entertainment';
+                        }
+
+                        return (
+                          <TravelRecommendationCard
+                            business={selectedBusiness}
+                            category={category}
+                            variant="compact"
+                            onBook={(business) => handleBookingRequest(business, category)}
+                            showBookingButton={true}
+                            className="border-0 shadow-none rounded-none"
+                          />
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
+
+                {/* Travel Mode Toggle */}
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Travel Assistant
+                  </h3>
+                  
+                  <div className="flex space-x-2 mb-4">
+                    <button
+                      onClick={() => setTravelMode('chat')}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        travelMode === 'chat'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Chat Mode
+                    </button>
+                    <button
+                      onClick={() => setTravelMode('itinerary')}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        travelMode === 'itinerary'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Itinerary
+                    </button>
+                  </div>
+
+                  {/* Quick Travel Actions */}
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handleGenerateItinerary(location?.city || 'San Francisco', 3, {})}
+                      disabled={!location}
+                      className="w-full px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Plan 3-Day Trip
+                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleTravelQuery('hotels', 'hotels')}
+                        className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                      >
+                        🏨 Hotels
+                      </button>
+                      <button
+                        onClick={() => handleTravelQuery('attractions', 'attractions')}
+                        className="px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors"
+                      >
+                        🎭 Attractions
+                      </button>
+                      <button
+                        onClick={() => handleTravelQuery('transportation', 'transportation')}
+                        className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors"
+                      >
+                        🚇 Transport
+                      </button>
+                      <button
+                        onClick={() => handleTravelQuery('dining', 'dining')}
+                        className="px-2 py-1 text-xs bg-orange-50 text-orange-700 rounded hover:bg-orange-100 transition-colors"
+                      >
+                        🍽️ Dining
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Quick Suggestions */}
                 <div className="bg-white rounded-xl shadow-lg p-6">
@@ -469,10 +701,12 @@ export default function Home() {
                   
                   <div className="space-y-3">
                     {[
-                      "Find me a good Italian restaurant nearby",
-                      "I want something budget-friendly for lunch",
-                      "Pick a fancy place for a special occasion",
-                      "Show me the best pizza in town"
+                      "Find me a hotel in downtown San Francisco",
+                      "What attractions should I visit in New York?",
+                      "I need a good Italian restaurant for dinner",
+                      "Show me entertainment options for tonight",
+                      "How do I get to the airport?",
+                      "Plan a 3-day trip to Los Angeles"
                     ].map((suggestion, index) => (
                       <button
                         key={index}
@@ -487,6 +721,8 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+
+
 
                 {/* Booking History */}
                 {completedBookings.length > 0 && (

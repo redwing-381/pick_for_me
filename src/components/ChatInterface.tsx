@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useConversation } from '@/contexts/ConversationContext';
 import { useChat } from '@/hooks/useChat';
 import RestaurantCard from '@/components/RestaurantCard';
+import { usePerformanceTracking, useDebounce } from '@/lib/travel-performance';
 import type { Location, UserPreferences, Business, InteractiveSuggestion } from '@/lib/types';
 
 // =============================================================================

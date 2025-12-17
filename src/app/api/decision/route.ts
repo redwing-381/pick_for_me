@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DecisionRequest, DecisionResponse } from '@/lib/types';
-import { decisionEngine, handleNoSuitableOptions } from '@/lib/decision-engine';
+import { 
+  decisionEngine, 
+  handleNoSuitableOptions, 
+  handleNoSuitableTravelOptions,
+  TravelDecisionRequest,
+  TravelDecisionResponse,
+  TravelCategory
+} from '@/lib/decision-engine';
 import { isValidLocation } from '@/lib/type-guards';
 
 export async function POST(request: NextRequest) {
@@ -29,28 +36,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare decision request
-    const decisionRequest: DecisionRequest = {
-      businesses: body.businesses,
-      userPreferences: body.userPreferences,
-      location: body.location,
-      conversationContext: body.conversationContext
-    };
+    // Determine if this is a travel decision request
+    const category: TravelCategory = body.category || 'dining';
+    const isTravel = category !== 'dining';
 
-    // Make decision
-    let decision: DecisionResponse;
+    let decision: DecisionResponse | TravelDecisionResponse;
     
     try {
-      decision = await decisionEngine.selectBestRestaurant(decisionRequest);
+      if (isTravel) {
+        // Handle travel categories
+        const travelRequest: TravelDecisionRequest = {
+          businesses: body.businesses,
+          userPreferences: body.userPreferences,
+          location: body.location,
+          conversationContext: body.conversationContext,
+          category,
+          travelContext: body.travelContext
+        };
+
+        decision = await decisionEngine.selectBestTravelOption(travelRequest);
+      } else {
+        // Handle dining (legacy)
+        const decisionRequest: DecisionRequest = {
+          businesses: body.businesses,
+          userPreferences: body.userPreferences,
+          location: body.location,
+          conversationContext: body.conversationContext
+        };
+
+        decision = await decisionEngine.selectBestRestaurant(decisionRequest);
+      }
     } catch (error) {
       // Handle case where no suitable options are found
-      if (error instanceof Error && error.message.includes('No restaurants found')) {
+      if (error instanceof Error && error.message.includes('No')) {
         try {
-          decision = await handleNoSuitableOptions(body.businesses, body.userPreferences);
+          if (isTravel) {
+            decision = await handleNoSuitableTravelOptions(
+              body.businesses, 
+              category, 
+              body.userPreferences, 
+              body.travelContext
+            );
+          } else {
+            decision = await handleNoSuitableOptions(body.businesses, body.userPreferences);
+          }
         } catch (fallbackError) {
+          const categoryName = isTravel ? category : 'restaurants';
           return NextResponse.json(
             { 
-              error: 'No suitable restaurants found',
+              error: `No suitable ${categoryName} found`,
               message: 'Please try adjusting your preferences or expanding your search area'
             },
             { status: 404 }
@@ -85,7 +119,7 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/decision',
     method: 'POST',
-    description: 'Autonomous decision-making engine for restaurant selection',
+    description: 'Autonomous decision-making engine for travel options including restaurants, hotels, attractions, transportation, and entertainment',
     required_fields: {
       businesses: 'Business[] - Array of restaurant options to choose from',
       userPreferences: 'UserPreferences - User dining preferences and constraints',
