@@ -1,0 +1,19 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Neo-brutalism style favicon for Pick For Me -->
+  <!-- Yellow background with black border -->
+  <rect x="1" y="1" width="30" height="30" fill="#FFE66D" stroke="#000000" stroke-width="2"/>
+  
+  <!-- Shadow effect -->
+  <rect x="3" y="3" width="26" height="26" fill="none" stroke="#000000" stroke-width="1" opacity="0.3"/>
+  
+  <!-- Letter P in bold -->
+  <path d="M8 8 L8 24 M8 8 L18 8 Q22 8 22 12 Q22 16 18 16 L8 16" 
+        stroke="#000000" 
+        stroke-width="2.5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
+  
+  <!-- Small accent dot -->
+  <circle cx="24" cy="10" r="2" fill="#4ECDC4" stroke="#000000" stroke-width="1"/>
+</svg>
