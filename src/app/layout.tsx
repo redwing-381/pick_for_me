@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { FirebaseStatus } from "../components/auth/FirebaseStatus";
 import { AuthProvider } from "../contexts/AuthContext";
 import { ToastProvider } from "../components/ui/Toast";
 
@@ -23,7 +22,6 @@ export default function RootLayout({
         <ToastProvider>
           <AuthProvider>
             {children}
-            <FirebaseStatus />
           </AuthProvider>
         </ToastProvider>
       </body>

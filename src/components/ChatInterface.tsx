@@ -304,13 +304,69 @@ export default function ChatInterface({
                 <div className="mt-3 space-y-3">
                   {message.businesses.slice(0, 3).map((business) => (
                     <div key={business.id} className="max-w-sm">
-                      <RestaurantCard
-                        restaurant={business}
-                        variant="compact"
-                        onSelect={handleBusinessClick}
-                        showBookingButton={false}
-                        className="shadow-sm"
-                      />
+                      <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all">
+                        {/* Business Image */}
+                        {business.image_url && (
+                          <img
+                            src={business.image_url}
+                            alt={business.name}
+                            className="w-full h-32 object-cover border-2 border-black mb-3"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        
+                        {/* Business Info */}
+                        <h4 className="text-lg font-black text-black mb-2">{business.name}</h4>
+                        
+                        <div className="flex items-center space-x-3 mb-2">
+                          <div className="flex items-center">
+                            <span className="text-yellow-400 font-black">★</span>
+                            <span className="text-sm font-bold text-black ml-1">
+                              {business.rating} ({business.review_count})
+                            </span>
+                          </div>
+                          {business.price && (
+                            <span className="text-sm font-black text-teal-600">
+                              {business.price}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {business.categories && business.categories.length > 0 && (
+                          <p className="text-xs font-bold text-gray-700 mb-3">
+                            {business.categories.map(c => c.title).join(', ')}
+                          </p>
+                        )}
+                        
+                        {business.location && (
+                          <p className="text-xs font-bold text-gray-600 mb-3">
+                            📍 {business.location.display_address.join(', ')}
+                          </p>
+                        )}
+                        
+                        {/* Action Buttons */}
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleBusinessClick(business)}
+                            className="flex-1 px-3 py-2 bg-teal-400 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all text-center"
+                          >
+                            Book Now
+                          </button>
+                          {business.url && (
+                            <a
+                              href={business.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-3 py-2 bg-yellow-400 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                            >
+                              🔗
+                            </a>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
