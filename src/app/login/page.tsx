@@ -45,7 +45,6 @@ export default function LoginPage() {
     >
       <LoginForm
         onSuccess={() => router.push('/app')}
-        showGoogleAuth={true}
       />
       
       <div className="mt-8 text-center">
