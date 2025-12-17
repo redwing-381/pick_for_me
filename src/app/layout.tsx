@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { FirebaseStatus } from "../components/auth/FirebaseStatus";
+import { AuthProvider } from "../contexts/AuthContext";
+import { ToastProvider } from "../components/ui/Toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,7 +19,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ToastProvider>
+          <AuthProvider>
+            {children}
+            <FirebaseStatus />
+          </AuthProvider>
+        </ToastProvider>
+      </body>
     </html>
   );
 }

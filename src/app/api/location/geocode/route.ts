@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Location, EnhancedLocation } from '@/lib/types';
-import { validateLocationInput, geocodeAddressToDetails } from '@/lib/location-utils';
-
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+import type { Location } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = request.nextUrl;
+    const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
 
     if (!query) {
@@ -17,85 +13,51 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const validation = validateLocationInput(query);
-    if (!validation.isValid) {
+    // Use Nominatim geocoding service with rate limiting
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'PickForMe/1.0 (contact@pickforme.app)',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Geocoding service error:', response.status, response.statusText);
       return NextResponse.json(
-        { error: validation.error || 'Invalid location query' },
-        { status: 400 }
+        { error: 'Geocoding service unavailable', locations: [] },
+        { status: 200 } // Return 200 with empty array instead of error
       );
     }
 
-    // Use enhanced geocoding for better results
-    let locations: EnhancedLocation[] = [];
-    
-    if (validation.type === 'coordinates') {
-      // Handle coordinates directly
-      const coordMatch = query.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-      if (coordMatch) {
-        const lat = parseFloat(coordMatch[1]);
-        const lng = parseFloat(coordMatch[2]);
-        
-        const enhancedLocation = await geocodeAddressToDetails(`${lat},${lng}`);
-        locations = enhancedLocation;
-      }
-    } else {
-      // Geocode address/city/zip
-      locations = await geocodeAddressToDetails(query);
+    const data = await response.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return NextResponse.json({ locations: [] });
     }
 
-    // Set caching headers for performance optimization
-    const response = NextResponse.json({
-      success: true,
-      locations,
-      query,
-      type: validation.type,
-      enhanced: true,
+    // Process results without additional API calls to avoid rate limiting
+    const locations: Location[] = data.slice(0, 5).map((result: any) => {
+      const address = result.address || {};
+      
+      return {
+        latitude: parseFloat(result.lat),
+        longitude: parseFloat(result.lon),
+        address: result.display_name,
+        city: address.city || address.town || address.village || address.municipality || 'Unknown',
+        state: address.state || address.region || address.county || address.province || 'Unknown',
+        zipCode: address.postcode || undefined,
+        country: address.country_code?.toUpperCase() || 'Unknown',
+      };
     });
 
-    // Add cache headers (1 hour for search results)
-    response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=1800');
-    response.headers.set('ETag', `"geocode-${Buffer.from(query).toString('base64')}"`);
-
-    return response;
+    return NextResponse.json({ locations });
   } catch (error) {
-    console.error('Enhanced geocoding error:', error);
-    
-    let errorCode = 'GEOCODING_ERROR';
-    let statusCode = 500;
-    let userMessage = 'Failed to find location. Please try a different address.';
-    let retryable = true;
-
-    if (error instanceof Error) {
-      if (error.message.includes('Failed to geocode address')) {
-        errorCode = 'NOT_FOUND_ERROR';
-        statusCode = 404;
-        userMessage = 'Address not found. Please try a different address.';
-        retryable = false;
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorCode = 'NETWORK_ERROR';
-        statusCode = 503;
-        userMessage = 'Network error. Please check your connection and try again.';
-        retryable = true;
-      } else if (error.message.includes('rate limit') || error.message.includes('429')) {
-        errorCode = 'RATE_LIMIT_ERROR';
-        statusCode = 429;
-        userMessage = 'Too many location requests. Please wait a moment and try again.';
-        retryable = true;
-      }
-    }
-
+    console.error('Geocoding error:', error);
     return NextResponse.json(
-      { 
-        success: false,
-        error: {
-          code: errorCode,
-          message: userMessage,
-          retryable,
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+      { locations: [] }, // Return empty array instead of error
+      { status: 200 }
     );
   }
 }
-

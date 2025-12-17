@@ -142,6 +142,7 @@ export interface MessageMetadata {
   suggested_actions?: string[];
   interactive_suggestions?: InteractiveSuggestion[];
   requires_clarification?: boolean;
+  aiDecision?: DecisionResponse; // AI Decision Delegation data
 }
 
 export interface InteractiveSuggestion {
@@ -336,6 +337,7 @@ export interface YelpAIResponse {
   requires_clarification?: boolean;
   clarification_questions?: string[];
   timestamp?: string;
+  aiDecision?: DecisionResponse; // AI Decision Delegation data
 }
 
 export interface YelpBusiness {

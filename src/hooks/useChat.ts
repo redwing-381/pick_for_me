@@ -32,8 +32,7 @@ interface UseChatReturn {
 export function useChat(): UseChatReturn {
   const { messages, isLoading, error, actions } = useConversation();
   const errorHandler = useErrorHandler({
-    component: 'ChatInterface',
-    enableNetworkMonitoring: true
+    component: 'ChatInterface'
   });
 
   const sendMessage = useCallback(async (
@@ -159,24 +158,25 @@ export function useChat(): UseChatReturn {
       }
     };
 
-    await errorHandler.handleAsyncAction(
-      () => sendMessageWithRetry(),
-      'sendMessage',
-      {
-        retry: () => sendMessageWithRetry(),
-        fallback: async () => {
-          // Fallback: Add a generic error message
-          actions.addMessage({
-            role: 'assistant',
-            content: 'I\'m having trouble connecting right now. Please check your internet connection and try again.',
-            metadata: {
-              // Connection error metadata
-            }
-          });
+    try {
+      await sendMessageWithRetry();
+    } catch (error) {
+      // Handle the error using the error handler
+      errorHandler.handleError(error as Error, { 
+        message, 
+        location: location?.city, 
+        userPreferences 
+      });
+      
+      // Add fallback message
+      actions.addMessage({
+        role: 'assistant',
+        content: 'I\'m having trouble connecting right now. Please check your internet connection and try again.',
+        metadata: {
+          // Connection error metadata
         }
-      },
-      { message, location: location?.city, userPreferences }
-    );
+      });
+    }
   }, [messages, actions, errorHandler]);
 
   const retry = useCallback(async () => {
@@ -198,7 +198,7 @@ export function useChat(): UseChatReturn {
 
   return {
     sendMessage,
-    isLoading: isLoading || errorHandler.isLoading,
+    isLoading: isLoading || errorHandler.isRetrying,
     error: error || errorHandler.error?.userMessage || null,
     retry,
     clearError

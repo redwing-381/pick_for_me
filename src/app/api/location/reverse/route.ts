@@ -1,73 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Location, EnhancedLocation } from '@/lib/types';
-import { isValidCoordinates, resolveCoordinatesToDetails } from '@/lib/location-utils';
-
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+import type { Location } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = request.nextUrl;
-    const lat = parseFloat(searchParams.get('lat') || '');
-    const lng = parseFloat(searchParams.get('lng') || '');
+    const searchParams = request.nextUrl.searchParams;
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
 
-    if (!isValidCoordinates(lat, lng)) {
+    if (!lat || !lng) {
       return NextResponse.json(
-        { error: 'Invalid coordinates provided' },
+        { error: 'Latitude and longitude parameters are required' },
         { status: 400 }
       );
     }
 
-    // Use enhanced geocoding with caching
-    const enhancedLocation = await resolveCoordinatesToDetails(lat, lng);
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
 
-    // Set caching headers for performance optimization
-    const response = NextResponse.json({
-      success: true,
-      location: enhancedLocation,
-      enhanced: true,
-      cached: false, // This would be determined by the caching layer
-    });
-
-    // Add cache headers (24 hours for location data)
-    response.headers.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200');
-    response.headers.set('ETag', `"${lat.toFixed(6)}-${lng.toFixed(6)}"`);
-
-    return response;
-  } catch (error) {
-    console.error('Enhanced reverse geocoding error:', error);
-    
-    let errorCode = 'GEOCODING_ERROR';
-    let statusCode = 500;
-    let userMessage = 'Failed to resolve location details. Please try again.';
-    let retryable = true;
-
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid coordinates')) {
-        errorCode = 'INVALID_COORDINATES';
-        statusCode = 400;
-        userMessage = 'Invalid coordinates provided.';
-        retryable = false;
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorCode = 'NETWORK_ERROR';
-        statusCode = 503;
-        userMessage = 'Network error. Please check your connection and try again.';
-        retryable = true;
-      }
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return NextResponse.json(
+        { error: 'Invalid coordinates' },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json(
-      { 
-        success: false,
-        error: {
-          code: errorCode,
-          message: userMessage,
-          retryable,
-          timestamp: new Date().toISOString()
-        }
-      },
-      { status: statusCode }
+    // Use Nominatim reverse geocoding service with proper headers
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'PickForMe/1.0 (contact@pickforme.app)',
+        },
+      }
     );
+
+    if (!response.ok) {
+      console.error('Reverse geocoding service error:', response.status, response.statusText);
+      // Return a basic location with coordinates
+      return NextResponse.json({
+        location: {
+          latitude,
+          longitude,
+          address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          city: 'Unknown',
+          state: 'Unknown',
+          zipCode: undefined,
+          country: 'Unknown',
+        }
+      });
+    }
+
+    const data = await response.json();
+    const address = data.address || {};
+
+    const location: Location = {
+      latitude,
+      longitude,
+      address: data.display_name || `${latitude}, ${longitude}`,
+      city: address.city || address.town || address.village || address.municipality || 'Unknown',
+      state: address.state || address.region || address.county || address.province || 'Unknown',
+      zipCode: address.postcode || undefined,
+      country: address.country_code?.toUpperCase() || 'Unknown',
+    };
+
+    return NextResponse.json({ location });
+  } catch (error) {
+    console.error('Reverse geocoding error:', error);
+    // Return a basic location with coordinates instead of error
+    const latitude = parseFloat(request.nextUrl.searchParams.get('lat') || '0');
+    const longitude = parseFloat(request.nextUrl.searchParams.get('lng') || '0');
+    
+    return NextResponse.json({
+      location: {
+        latitude,
+        longitude,
+        address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        city: 'Unknown',
+        state: 'Unknown',
+        zipCode: undefined,
+        country: 'Unknown',
+      }
+    });
   }
 }
-

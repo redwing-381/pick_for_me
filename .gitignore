@@ -38,6 +38,3 @@ next-env.d.ts
 # bun
 .bun
 .env
-.kiro/specs/pick-for-me/tasks.md
-/.kiro
-/.kiro

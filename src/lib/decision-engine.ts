@@ -257,7 +257,7 @@ export class DecisionEngine {
   }
 
   /**
-   * Generate human-readable reasoning for the selection
+   * Generate human-readable reasoning for the selection with AI confidence
    */
   private generateReasoning(
     business: Business,
@@ -269,7 +269,8 @@ export class DecisionEngine {
       .sort((a, b) => (b.score * b.weight) - (a.score * a.weight))
       .slice(0, 3);
 
-    let reasoning = `I selected ${business.name} because it excels in several key areas: `;
+    // Start with confident AI language
+    let reasoning = `🎯 **AI Decision:** I've selected ${business.name} as your perfect choice. Here's why: `;
 
     const reasons: string[] = [];
 
@@ -277,19 +278,19 @@ export class DecisionEngine {
       if (factor.score > 0.7) {
         switch (factor.name) {
           case 'Rating':
-            reasons.push(`it has excellent ratings (${business.rating}/5 stars)`);
+            reasons.push(`exceptional ${business.rating}/5 star rating with ${business.review_count} reviews`);
             break;
           case 'Price Match':
-            reasons.push(`it matches your budget preference (${business.price})`);
+            reasons.push(`perfect ${business.price} pricing for your budget`);
             break;
           case 'Distance':
-            reasons.push(`it's conveniently located nearby`);
+            reasons.push(`ideal location just ${business.distance?.toFixed(1) || 'nearby'} miles away`);
             break;
           case 'Cuisine Match':
-            reasons.push(`it serves your preferred cuisine`);
+            reasons.push(`exactly the ${business.categories.map(c => c.title).join(', ')} you're craving`);
             break;
           case 'Popularity':
-            reasons.push(`it's well-reviewed by many customers`);
+            reasons.push(`proven favorite with ${business.review_count}+ happy customers`);
             break;
         }
       }
@@ -298,31 +299,46 @@ export class DecisionEngine {
     if (reasons.length > 0) {
       reasoning += reasons.join(', ') + '.';
     } else {
-      reasoning += 'it provides the best overall balance of quality, location, and value.';
+      reasoning += 'optimal balance of quality, location, and value based on your preferences.';
     }
+
+    // Add AI confidence statement
+    reasoning += ` I'm confident this choice will exceed your expectations.`;
 
     // Add context-specific reasoning
     if (context?.stage === 'decision_made') {
-      reasoning += ' This choice aligns with your previous preferences in our conversation.';
+      reasoning += ' This aligns perfectly with your conversation history.';
     }
 
     return reasoning;
   }
 
   /**
-   * Calculate confidence based on score distribution
+   * Calculate confidence based on score distribution with enhanced AI confidence
    */
   private calculateConfidence(scoredBusinesses: Array<{ score: number }>): number {
-    if (scoredBusinesses.length < 2) return 0.8;
+    if (scoredBusinesses.length < 2) return 0.85; // Higher base confidence for single option
 
     const topScore = scoredBusinesses[0].score;
     const secondScore = scoredBusinesses[1].score;
     const scoreDifference = topScore - secondScore;
 
+    // Enhanced confidence calculation for AI decision delegation
     // Higher difference = higher confidence
-    // Scale from 0.5 (low confidence) to 0.95 (high confidence)
-    const confidence = Math.min(0.95, 0.5 + (scoreDifference * 2));
-    return Math.max(0.5, confidence);
+    // Scale from 0.65 (moderate confidence) to 0.98 (very high confidence)
+    let confidence = Math.min(0.98, 0.65 + (scoreDifference * 2.5));
+    
+    // Boost confidence if top choice has excellent rating
+    if (topScore > 0.8) {
+      confidence = Math.min(0.98, confidence + 0.1);
+    }
+    
+    // Boost confidence if there's a clear winner
+    if (scoreDifference > 0.3) {
+      confidence = Math.min(0.98, confidence + 0.05);
+    }
+
+    return Math.max(0.65, confidence);
   }
 
   // =============================================================================

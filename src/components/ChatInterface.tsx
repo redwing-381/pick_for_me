@@ -4,8 +4,9 @@ import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useConversation } from '@/contexts/ConversationContext';
 import { useChat } from '@/hooks/useChat';
 import RestaurantCard from '@/components/RestaurantCard';
-import { usePerformanceTracking, useDebounce } from '@/lib/travel-performance';
-import type { Location, UserPreferences, Business, InteractiveSuggestion } from '@/lib/types';
+import AIDecisionCard from '@/components/AIDecisionCard';
+// Performance tracking imports removed - using standard React hooks
+import type { Location, UserPreferences, Business, InteractiveSuggestion, DecisionResponse } from '@/lib/types';
 
 // =============================================================================
 // CHAT INTERFACE COMPONENT
@@ -19,7 +20,7 @@ interface ChatInterfaceProps {
 }
 
 export default function ChatInterface({
-  location,
+  location = null,
   userPreferences,
   onBusinessSelected,
   className = ''
@@ -228,24 +229,41 @@ export default function ChatInterface({
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white rounded-lg shadow-sm border ${className}`}>
+    <div className={`flex flex-col h-full bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] ${className}`}>
       {/* Header */}
-      <div className="flex-shrink-0 px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-        <h2 className="text-lg font-semibold text-gray-900">Pick For Me</h2>
-        <p className="text-sm text-gray-600">Tell me what you&apos;re craving, and I&apos;ll pick the perfect spot!</p>
+      <div className="flex-shrink-0 px-6 py-4 border-b-4 border-black bg-yellow-400">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-black border-2 border-black flex items-center justify-center">
+            <span className="text-yellow-400 font-black text-xl">🤖</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-black">Pick For Me</h2>
+            <p className="text-sm font-bold text-black">Tell me what you&apos;re craving!</p>
+          </div>
+        </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 bg-gray-50">
         {messages.length === 0 && (
-          <div className="text-center py-8">
-            <div className="text-gray-500 mb-4">
-              <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.98L3 20l1.98-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
-              </svg>
+          <div className="text-center py-12">
+            <div className="w-20 h-20 bg-teal-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mx-auto mb-6 flex items-center justify-center transform rotate-3">
+              <span className="text-black font-black text-3xl">💬</span>
             </div>
-            <p className="text-gray-600 mb-2">Start a conversation!</p>
-            <p className="text-sm text-gray-500">Try: &ldquo;Find me a good Italian restaurant nearby&rdquo;</p>
+            <p className="text-xl font-black text-black mb-3">Let&apos;s Find Your Perfect Spot!</p>
+            <p className="text-base font-bold text-gray-700 mb-6">I&apos;ll help you discover amazing places</p>
+            <div className="max-w-md mx-auto space-y-2">
+              <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-3">
+                <p className="text-sm font-bold text-gray-800">💡 Try asking:</p>
+                <p className="text-sm text-gray-600 mt-1">&ldquo;Find me a cozy Italian restaurant nearby&rdquo;</p>
+              </div>
+              <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-3">
+                <p className="text-sm text-gray-600">&ldquo;I want sushi for under $30&rdquo;</p>
+              </div>
+              <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-3">
+                <p className="text-sm text-gray-600">&ldquo;Show me the best spa in town&rdquo;</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -255,16 +273,34 @@ export default function ChatInterface({
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+              className={`max-w-xs lg:max-w-md border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-4 py-3 ${
                 message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  ? 'bg-blue-400'
+                  : 'bg-white'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              <p className="text-sm font-bold text-black">{message.content}</p>
               
-              {/* Show businesses if present */}
-              {message.businesses && message.businesses.length > 0 && (
+              {/* Show AI Decision if present */}
+              {message.metadata?.aiDecision && (
+                <div className="mt-4 -mx-4 -mb-2">
+                  <AIDecisionCard
+                    decision={message.metadata.aiDecision}
+                    onBook={(business) => {
+                      handleBusinessClick(business);
+                      // Trigger booking flow
+                      handleSuggestedAction('Make a reservation', business);
+                    }}
+                    onShowAlternatives={() => {
+                      handleSuggestedAction('Show alternatives');
+                    }}
+                    className="max-w-2xl"
+                  />
+                </div>
+              )}
+
+              {/* Show businesses if present (fallback for non-AI decisions) */}
+              {message.businesses && message.businesses.length > 0 && !message.metadata?.aiDecision && (
                 <div className="mt-3 space-y-3">
                   {message.businesses.slice(0, 3).map((business) => (
                     <div key={business.id} className="max-w-sm">
@@ -282,11 +318,11 @@ export default function ChatInterface({
 
               {/* Show clarification questions */}
               {message.metadata?.requires_clarification && (
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800 font-medium mb-2">I need a bit more info to help you better:</p>
+                <div className="mt-3 p-3 bg-yellow-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  <p className="text-xs text-black font-black mb-2">💡 I need a bit more info:</p>
                   <div className="space-y-1">
                     {/* This would show individual clarification questions if available */}
-                    <p className="text-xs text-yellow-700">Feel free to be more specific about what you&apos;re looking for!</p>
+                    <p className="text-xs text-black font-bold">Feel free to be more specific about what you&apos;re looking for!</p>
                   </div>
                 </div>
               )}
@@ -299,15 +335,15 @@ export default function ChatInterface({
                       key={index}
                       onClick={() => handleSuggestedAction(action, message.businesses?.[0])}
                       disabled={isLoading}
-                      className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                      className={`px-3 py-2 text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
                         message.metadata?.requires_clarification
-                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300 hover:shadow-sm'
+                          ? 'bg-yellow-400 text-black'
+                          : 'bg-white text-black'
                       }`}
                     >
                       {isLoading ? (
                         <div className="flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-current animate-pulse"></div>
                           <span>{action}</span>
                         </div>
                       ) : (
@@ -321,20 +357,18 @@ export default function ChatInterface({
               {/* Show interactive suggestions */}
               {message.metadata?.interactive_suggestions && message.metadata.interactive_suggestions.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  <p className="text-xs text-gray-600 font-medium">Try these:</p>
+                  <p className="text-xs text-black font-black">Try these:</p>
                   <div className="flex flex-wrap gap-2">
                     {message.metadata.interactive_suggestions.map((suggestion) => (
                       <button
                         key={suggestion.id}
                         onClick={() => handleInteractiveSuggestion(suggestion)}
                         disabled={isLoading}
-                        className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                          getSuggestionStyle(suggestion.category, suggestion.action)
-                        }`}
+                        className="px-3 py-2 text-xs font-black bg-white text-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                       >
                         {isLoading ? (
                           <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-current animate-pulse"></div>
                             <span>{suggestion.text}</span>
                           </div>
                         ) : (
@@ -349,7 +383,7 @@ export default function ChatInterface({
                 </div>
               )}
 
-              <div className="text-xs opacity-70 mt-2">
+              <div className="text-xs font-bold text-gray-600 mt-2">
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -359,14 +393,14 @@ export default function ChatInterface({
         {/* Loading indicator */}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg px-4 py-2">
-              <div className="flex items-center space-x-2">
+            <div className="bg-yellow-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-4 py-3">
+              <div className="flex items-center space-x-3">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-3 h-3 bg-black animate-bounce"></div>
+                  <div className="w-3 h-3 bg-black animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-3 h-3 bg-black animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <span className="text-sm font-black text-black">Thinking...</span>
               </div>
             </div>
           </div>
@@ -375,24 +409,24 @@ export default function ChatInterface({
         {/* Error message */}
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm max-w-md">
+            <div className="bg-red-400 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-4 py-3 text-sm max-w-md">
               <div className="flex items-start space-x-3">
-                <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div className="w-6 h-6 bg-black flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-400 font-black text-lg">!</span>
+                </div>
                 <div className="flex-1">
-                  <p className="font-medium mb-1">Something went wrong</p>
-                  <p className="text-red-700 mb-3">{error}</p>
+                  <p className="font-black text-black mb-1">Oops!</p>
+                  <p className="font-bold text-black mb-3">{error}</p>
                   <div className="flex space-x-2">
                     <button
                       onClick={retry}
-                      className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 transition-colors"
+                      className="text-xs font-black bg-black text-red-400 px-3 py-2 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
                     >
                       Try Again
                     </button>
                     <button
                       onClick={clearError}
-                      className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 transition-colors"
+                      className="text-xs font-black bg-white text-black px-3 py-2 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
                     >
                       Dismiss
                     </button>
@@ -407,8 +441,8 @@ export default function ChatInterface({
       </div>
 
       {/* Input Area */}
-      <div className="flex-shrink-0 border-t p-4">
-        <div className="flex space-x-2">
+      <div className="flex-shrink-0 border-t-4 border-black p-4 bg-white">
+        <div className="flex space-x-3">
           <input
             ref={inputRef}
             type="text"
@@ -416,16 +450,16 @@ export default function ChatInterface({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Tell me what you&apos;re looking for..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+            className="flex-1 px-4 py-3 border-4 border-black font-bold text-black placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-3 bg-teal-400 text-black font-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] active:shadow-none active:translate-x-1 active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none transition-all"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
         </div>

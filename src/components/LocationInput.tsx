@@ -127,24 +127,34 @@ export default function LocationInput({
     }
   };
 
-  const handleManualInput = async (input: string) => {
+  const handleManualInput = (input: string) => {
     setManualInput(input);
     
     if (input.length < 3) {
       setSuggestions([]);
+      setIsLoadingSuggestions(false);
       return;
     }
 
+    // Clear previous timeout
+    if ((window as any).geocodeTimeout) {
+      clearTimeout((window as any).geocodeTimeout);
+    }
+    
     setIsLoadingSuggestions(true);
     
-    try {
-      const locations = await geocodeAddress(input);
-      setSuggestions(locations);
-    } catch (err) {
-      setSuggestions([]);
-    } finally {
-      setIsLoadingSuggestions(false);
-    }
+    // Set new timeout - debounce API calls
+    (window as any).geocodeTimeout = setTimeout(async () => {
+      try {
+        const locations = await geocodeAddress(input);
+        setSuggestions(locations || []);
+      } catch (err) {
+        console.error('Geocoding error:', err);
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }, 1000); // Wait 1 second before making API call
   };
 
   const handleConfirmLocation = () => {
@@ -183,17 +193,19 @@ export default function LocationInput({
     
     try {
       const locations = await geocodeAddress(manualInput);
-      if (locations.length > 0) {
+      if (locations && locations.length > 0) {
         handleSelectSuggestion(locations[0]);
       } else {
+        // If no results, show error but don't fail completely
         onLocationChange({
-          error: ERROR_MESSAGES.INVALID_LOCATION,
+          error: 'Location not found. Try a different search term.',
           location: null,
         });
       }
     } catch (err) {
+      console.error('Manual submit error:', err);
       onLocationChange({
-        error: ERROR_MESSAGES.INVALID_LOCATION,
+        error: 'Unable to find location. Please try again.',
         location: null,
       });
     } finally {
@@ -328,40 +340,43 @@ export default function LocationInput({
                 type="text"
                 value={manualInput}
                 onChange={(e) => handleManualInput(e.target.value)}
-                placeholder="Enter city, address, or zip code"
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                placeholder="e.g., New York, NY or 10001"
+                className="w-full px-4 py-3 pr-12 border-4 border-black font-bold text-black placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-yellow-400"
               />
               <button
                 type="submit"
                 disabled={isLoadingSuggestions || !manualInput.trim()}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-teal-400 border-2 border-black disabled:opacity-50"
               >
                 {isLoadingSuggestions ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  <div className="animate-spin w-5 h-5 border-4 border-black border-t-transparent"></div>
                 ) : (
-                  <MagnifyingGlassIcon className="h-4 w-4" />
+                  <MagnifyingGlassIcon className="h-5 w-5 text-black" />
                 )}
               </button>
             </div>
 
             {/* Suggestions Dropdown */}
             {suggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+              <div className="absolute z-10 w-full mt-2 bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-h-60 overflow-auto">
                 {suggestions.map((suggestion, index) => (
                   <button
                     key={index}
                     type="button"
                     onClick={() => handleSelectSuggestion(suggestion)}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                    className="w-full px-4 py-3 text-left hover:bg-yellow-400 focus:outline-none focus:bg-yellow-400 border-b-4 border-black last:border-b-0 transition-colors"
                   >
                     <div className="flex items-center">
-                      <MapPinIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                      <div className="w-6 h-6 bg-teal-400 border-2 border-black flex items-center justify-center mr-3 flex-shrink-0">
+                        <span className="text-black text-xs">📍</span>
+                      </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {suggestion.address}
-                        </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-black text-black">
                           {suggestion.city}, {suggestion.state}
+                        </p>
+                        <p className="text-xs font-bold text-gray-700">
+                          {suggestion.country !== 'Unknown' && `${suggestion.country} • `}
+                          {suggestion.zipCode || 'No zip code'}
                         </p>
                       </div>
                     </div>
@@ -405,12 +420,18 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<Loca
 }
 
 async function geocodeAddress(address: string): Promise<Location[]> {
-  const response = await fetch(`/api/location/geocode?q=${encodeURIComponent(address)}`);
-  
-  if (!response.ok) {
-    throw new Error('Failed to geocode address');
+  try {
+    const response = await fetch(`/api/location/geocode?q=${encodeURIComponent(address)}`);
+    
+    if (!response.ok) {
+      console.error('Geocode API error:', response.status, response.statusText);
+      return [];
+    }
+    
+    const data = await response.json();
+    return data.locations || [];
+  } catch (error) {
+    console.error('Geocode fetch error:', error);
+    return [];
   }
-  
-  const data = await response.json();
-  return data.locations || [];
 }

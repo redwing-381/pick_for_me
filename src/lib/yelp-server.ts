@@ -39,133 +39,17 @@ export function createMockYelpAIResponse(
   console.log('🎭 Creating mock response for:', userMessage);
   console.log('📍 Using location:', location?.address || 'No location provided');
   
-  // Mock business data - location-aware
-  const mockBusinesses: Business[] = [
-    {
-      id: 'mock-restaurant-1',
-      name: 'The Perfect Bistro',
-      rating: 4.5,
-      review_count: 324,
-      price: '$$',
-      categories: [
-        { alias: 'french', title: 'French' },
-        { alias: 'bistros', title: 'Bistros' }
-      ],
-      location: {
-        address1: '123 Main St',
-        city: location?.city || 'San Francisco',
-        state: location?.state || 'CA',
-        zip_code: '94102',
-        country: 'US',
-        display_address: ['123 Main St', 'San Francisco, CA 94102']
-      },
-      coordinates: {
-        latitude: location?.latitude || 37.7749,
-        longitude: location?.longitude || -122.4194
-      },
-      photos: [
-        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-        'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400'
-      ],
-      phone: '+14155551234',
-      display_phone: '(415) 555-1234',
-      url: 'https://www.yelp.com/biz/the-perfect-bistro',
-      image_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-      is_closed: false,
-      distance: 0.5,
-      transactions: ['restaurant_reservation', 'delivery'],
-      reservationUrl: 'https://www.yelp.com/reservations/the-perfect-bistro',
-      hours: [{
-        open: [
-          { is_overnight: false, start: '1100', end: '2200', day: 0 },
-          { is_overnight: false, start: '1100', end: '2200', day: 1 },
-          { is_overnight: false, start: '1100', end: '2200', day: 2 },
-          { is_overnight: false, start: '1100', end: '2200', day: 3 },
-          { is_overnight: false, start: '1100', end: '2300', day: 4 },
-          { is_overnight: false, start: '1100', end: '2300', day: 5 },
-          { is_overnight: false, start: '1000', end: '2200', day: 6 }
-        ],
-        hours_type: 'REGULAR',
-        is_open_now: true
-      }]
-    },
-    {
-      id: 'mock-restaurant-2',
-      name: 'Cozy Corner Cafe',
-      rating: 4.2,
-      review_count: 156,
-      price: '$',
-      categories: [
-        { alias: 'cafes', title: 'Cafes' },
-        { alias: 'breakfast_brunch', title: 'Breakfast & Brunch' }
-      ],
-      location: {
-        address1: '456 Oak Ave',
-        city: location?.city || 'San Francisco',
-        state: location?.state || 'CA',
-        zip_code: '94103',
-        country: 'US',
-        display_address: ['456 Oak Ave', 'San Francisco, CA 94103']
-      },
-      coordinates: {
-        latitude: (location?.latitude || 37.7749) + 0.01,
-        longitude: (location?.longitude || -122.4194) + 0.01
-      },
-      photos: [
-        'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400'
-      ],
-      phone: '+14155555678',
-      display_phone: '(415) 555-5678',
-      url: 'https://www.yelp.com/biz/cozy-corner-cafe',
-      image_url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-      is_closed: false,
-      distance: 0.8,
-      transactions: ['pickup', 'delivery'],
-      hours: [{
-        open: [
-          { is_overnight: false, start: '0700', end: '1500', day: 0 },
-          { is_overnight: false, start: '0700', end: '1500', day: 1 },
-          { is_overnight: false, start: '0700', end: '1500', day: 2 },
-          { is_overnight: false, start: '0700', end: '1500', day: 3 },
-          { is_overnight: false, start: '0700', end: '1500', day: 4 },
-          { is_overnight: false, start: '0700', end: '1500', day: 5 },
-          { is_overnight: false, start: '0800', end: '1400', day: 6 }
-        ],
-        hours_type: 'REGULAR',
-        is_open_now: true
-      }]
-    }
-  ];
+  // Emergency fallback - no business data when Yelp API unavailable
+  const fallbackBusinesses: Business[] = [];
 
-  // Generate response based on user message and location
-  let responseMessage = location 
-    ? `I found some great options near ${location.city || location.address}! ` 
-    : "I found some great options for you! ";
-  let selectedBusinesses = mockBusinesses;
-
-  if (userMessage.toLowerCase().includes('italian')) {
-    responseMessage = location 
-      ? `I found some excellent Italian restaurants near ${location.city || location.address}! ` 
-      : "I found some excellent Italian restaurants for you! ";
-    selectedBusinesses = mockBusinesses.map(b => ({
-      ...b,
-      categories: [{ alias: 'italian', title: 'Italian' }],
-      name: b.name.replace('Bistro', 'Italian Kitchen').replace('Cafe', 'Pizzeria')
-    }));
-  } else if (userMessage.toLowerCase().includes('cheap') || userMessage.toLowerCase().includes('budget')) {
-    responseMessage = "Here are some great budget-friendly options! ";
-    selectedBusinesses = mockBusinesses.filter(b => b.price === '$');
-  } else if (userMessage.toLowerCase().includes('fancy') || userMessage.toLowerCase().includes('fine dining')) {
-    responseMessage = "I found some upscale dining options for you! ";
-    selectedBusinesses = mockBusinesses.map(b => ({ ...b, price: '$$$' as const }));
-  }
-
-  const locationContext = location 
-    ? ` The closest option is ${selectedBusinesses[0].name}, just ${selectedBusinesses[0].distance} miles away.`
-    : '';
+  // Note: This is a fallback response when Yelp API is unavailable
+  // In production, ensure YELP_API_KEY is properly configured
+  const responseMessage = "I'm currently unable to connect to Yelp's services. Please try again later or ensure your API key is configured.";
+  
+  let selectedBusinesses = fallbackBusinesses;
 
   return {
-    message: responseMessage + "Based on your preferences" + (location ? ` and location in ${location.city || location.address}` : '') + ", I'd recommend " + selectedBusinesses[0].name + ". It has excellent reviews and fits what you're looking for perfectly!" + locationContext,
+    message: responseMessage,
     businesses: selectedBusinesses,
     reservation_info: {
       available_times: ['18:00', '18:30', '19:00', '19:30', '20:00', '20:30'],

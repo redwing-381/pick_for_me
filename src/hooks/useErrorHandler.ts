@@ -1,200 +1,236 @@
-'use client';
+import { useCallback, useEffect, useState } from 'react';
+import { AuthError, AuthErrorCode, AuthErrorSeverity } from '../lib/errors';
+import { useToast } from '../components/ui/Toast';
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  AppError, 
-  ErrorRecoveryOptions, 
-  ErrorContext,
-  AppErrorHandler,
-  createErrorContext,
-  getErrorCode
-} from '@/lib/error-handling';
-
-// =============================================================================
-// ERROR HANDLER HOOK
-// =============================================================================
-
-export interface UseErrorHandlerOptions {
-  component: string;
-  onError?: (error: AppError) => void;
-  enableNetworkMonitoring?: boolean;
+export interface ErrorHandlerOptions {
+  showToast?: boolean;
+  logError?: boolean;
+  retryable?: boolean;
+  onError?: (error: AuthError) => void;
+  component?: string;
 }
 
-export interface UseErrorHandlerReturn {
-  error: AppError | null;
-  isOnline: boolean;
-  isLoading: boolean;
-  handleError: (error: unknown, action: string, additionalData?: Record<string, unknown>) => AppError;
-  handleAsyncAction: <T>(
-    asyncFn: () => Promise<T>,
-    action: string,
-    recoveryOptions?: ErrorRecoveryOptions,
-    additionalData?: Record<string, unknown>
-  ) => Promise<T | null>;
-  clearError: () => void;
-  retry: () => Promise<void>;
-  errorLog: AppError[];
+export interface ErrorState {
+  error: AuthError | null;
+  isRetrying: boolean;
+  retryCount: number;
+  canRetry: boolean;
 }
 
-export function useErrorHandler(options: UseErrorHandlerOptions): UseErrorHandlerReturn {
-  const [error, setError] = useState<AppError | null>(null);
-  const [isOnline, setIsOnline] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastAction, setLastAction] = useState<(() => Promise<void>) | null>(null);
+const DEFAULT_OPTIONS: ErrorHandlerOptions = {
+  showToast: true,
+  logError: true,
+  retryable: true,
+  component: 'Unknown',
+};
 
-  const errorHandler = AppErrorHandler.getInstance();
+/**
+ * Hook for handling errors in React components
+ */
+export function useErrorHandler(options: ErrorHandlerOptions = {}) {
+  const { addToast } = useToast();
+  const config = { ...DEFAULT_OPTIONS, ...options };
+  
+  const [errorState, setErrorState] = useState<ErrorState>({
+    error: null,
+    isRetrying: false,
+    retryCount: 0,
+    canRetry: false,
+  });
 
-  // Initialize network monitoring
-  useEffect(() => {
-    if (options.enableNetworkMonitoring !== false) {
-      setIsOnline(errorHandler.getNetworkStatus());
-      
-      const unsubscribe = errorHandler.onNetworkChange((online) => {
-        setIsOnline(online);
-        if (online && error && error.code === 'NETWORK_ERROR') {
-          // Clear network errors when coming back online
-          setError(null);
-        }
-      });
+  // Error logging function
+  const logError = useCallback((error: AuthError) => {
+    if (!config.logError) return;
 
-      return unsubscribe;
+    const logData = error.toLogObject();
+    
+    // In development, log to console
+    if (process.env.NODE_ENV === 'development') {
+      console.group(`🚨 AuthError in ${config.component}`);
+      console.error('Error Details:', logData);
+      console.groupEnd();
     }
-  }, [options.enableNetworkMonitoring, error]);
 
-  // Handle error creation
-  const handleError = useCallback((
-    originalError: unknown,
-    action: string,
-    additionalData?: Record<string, unknown>
-  ): AppError => {
-    const context = createErrorContext(options.component, action, additionalData);
-    const errorCode = getErrorCode(originalError);
-    const appError = errorHandler.createError(errorCode, originalError, context);
-    
-    setError(appError);
-    options.onError?.(appError);
-    
-    return appError;
-  }, [options.component, options.onError]);
+    // In production, send to logging service
+    // This would typically be sent to a service like Sentry, LogRocket, etc.
+    if (process.env.NODE_ENV === 'production') {
+      // Example: Send to logging service
+      // logToService(logData);
+    }
+  }, [config.logError, config.component]);
 
-  // Handle async actions with error recovery
-  const handleAsyncAction = useCallback(async <T>(
-    asyncFn: () => Promise<T>,
-    action: string,
-    recoveryOptions?: ErrorRecoveryOptions,
-    additionalData?: Record<string, unknown>
-  ): Promise<T | null> => {
-    setIsLoading(true);
-    setError(null);
+  // Show toast notification
+  const showErrorToast = useCallback((error: AuthError) => {
+    if (!config.showToast) return;
 
-    // Store the action for potential retry
-    setLastAction(() => async () => {
-      await asyncFn();
+    const toastType = error.severity === AuthErrorSeverity.CRITICAL ? 'error' :
+                     error.severity === AuthErrorSeverity.HIGH ? 'error' :
+                     error.severity === AuthErrorSeverity.MEDIUM ? 'warning' : 'info';
+
+    addToast({
+      type: toastType,
+      title: 'Error',
+      message: error.userMessage,
+      duration: error.severity === AuthErrorSeverity.CRITICAL ? 0 : 5000, // Critical errors don't auto-dismiss
     });
+  }, [config.showToast, addToast]);
 
-    try {
-      const result = await asyncFn();
-      setIsLoading(false);
-      return result;
-    } catch (originalError) {
-      setIsLoading(false);
-      
-      const context = createErrorContext(options.component, action, additionalData);
-      const errorCode = getErrorCode(originalError);
-      const appError = errorHandler.createError(errorCode, originalError, context);
-      
-      if (recoveryOptions) {
-        try {
-          await errorHandler.handleErrorWithRecovery(appError, recoveryOptions);
-          return null; // Recovery handled the error
-        } catch (recoveryError) {
-          // Recovery failed, show the original error
-          setError(appError);
-          options.onError?.(appError);
-          return null;
-        }
-      } else {
-        setError(appError);
-        options.onError?.(appError);
-        return null;
-      }
+  // Handle error function
+  const handleError = useCallback((
+    error: Error | AuthError,
+    context: Record<string, any> = {}
+  ) => {
+    const authError = error instanceof AuthError 
+      ? error 
+      : AuthError.fromError(error, { 
+          component: config.component,
+          ...context 
+        });
+
+    // Log the error
+    logError(authError);
+
+    // Show toast notification
+    showErrorToast(authError);
+
+    // Update error state
+    setErrorState(prev => ({
+      error: authError,
+      isRetrying: false,
+      retryCount: prev.error?.code === authError.code ? prev.retryCount : 0,
+      canRetry: Boolean(config.retryable && authError.isRetryable()),
+    }));
+
+    // Call custom error handler
+    if (config.onError) {
+      config.onError(authError);
     }
-  }, [options.component, options.onError]);
 
-  // Clear current error
+    return authError;
+  }, [config, logError, showErrorToast]);
+
+  // Clear error function
   const clearError = useCallback(() => {
-    setError(null);
+    setErrorState({
+      error: null,
+      isRetrying: false,
+      retryCount: 0,
+      canRetry: false,
+    });
   }, []);
 
-  // Retry last action
-  const retry = useCallback(async () => {
-    if (lastAction && error?.retryable) {
-      setError(null);
-      setIsLoading(true);
-      
-      try {
-        await lastAction();
-        setIsLoading(false);
-      } catch (retryError) {
-        setIsLoading(false);
-        const context = createErrorContext(options.component, 'retry');
-        const errorCode = getErrorCode(retryError);
-        const appError = errorHandler.createError(errorCode, retryError, context);
-        setError(appError);
-        options.onError?.(appError);
-      }
+  // Retry function
+  const retry = useCallback(async (retryFn?: () => Promise<void>) => {
+    if (!errorState.canRetry || !errorState.error) {
+      return;
     }
-  }, [lastAction, error, options.component, options.onError]);
+
+    setErrorState(prev => ({
+      ...prev,
+      isRetrying: true,
+      retryCount: prev.retryCount + 1,
+    }));
+
+    try {
+      if (retryFn) {
+        await retryFn();
+      }
+      clearError();
+    } catch (error) {
+      handleError(error as Error, { retryAttempt: errorState.retryCount + 1 });
+    }
+  }, [errorState, handleError, clearError]);
+
+  // Wrap async function with error handling
+  const wrapAsync = useCallback(<T extends any[], R>(
+    fn: (...args: T) => Promise<R>,
+    context?: Record<string, any>
+  ) => {
+    return async (...args: T): Promise<R | undefined> => {
+      try {
+        clearError();
+        return await fn(...args);
+      } catch (error) {
+        handleError(error as Error, context);
+        return undefined;
+      }
+    };
+  }, [handleError, clearError]);
+
+  // Wrap sync function with error handling
+  const wrapSync = useCallback(<T extends any[], R>(
+    fn: (...args: T) => R,
+    context?: Record<string, any>
+  ) => {
+    return (...args: T): R | undefined => {
+      try {
+        clearError();
+        return fn(...args);
+      } catch (error) {
+        handleError(error as Error, context);
+        return undefined;
+      }
+    };
+  }, [handleError, clearError]);
+
+  // Handle form validation errors
+  const handleFormError = useCallback((
+    fieldErrors: Record<string, string>,
+    context: Record<string, any> = {}
+  ) => {
+    const formError = AuthError.formValidation(fieldErrors, {
+      component: config.component,
+      ...context,
+    });
+
+    return handleError(formError, context);
+  }, [handleError, config.component]);
+
+  // Handle validation error
+  const handleValidationError = useCallback((
+    message: string,
+    context: Record<string, any> = {}
+  ) => {
+    const validationError = AuthError.validation(message, {
+      component: config.component,
+      ...context,
+    });
+
+    return handleError(validationError, context);
+  }, [handleError, config.component]);
+
+  // Handle network error
+  const handleNetworkError = useCallback((
+    context: Record<string, any> = {}
+  ) => {
+    const networkError = AuthError.network({
+      component: config.component,
+      ...context,
+    });
+
+    return handleError(networkError, context);
+  }, [handleError, config.component]);
 
   return {
-    error,
-    isOnline,
-    isLoading,
+    // Error state
+    error: errorState.error,
+    isRetrying: errorState.isRetrying,
+    retryCount: errorState.retryCount,
+    canRetry: errorState.canRetry,
+    hasError: !!errorState.error,
+
+    // Error handling functions
     handleError,
-    handleAsyncAction,
     clearError,
     retry,
-    errorLog: errorHandler.getErrorLog()
+
+    // Wrapper functions
+    wrapAsync,
+    wrapSync,
+
+    // Specific error handlers
+    handleFormError,
+    handleValidationError,
+    handleNetworkError,
   };
-}
-
-// =============================================================================
-// SPECIALIZED HOOKS
-// =============================================================================
-
-export function useAPIErrorHandler(component: string) {
-  return useErrorHandler({
-    component,
-    enableNetworkMonitoring: true,
-    onError: (error) => {
-      // Log API errors for monitoring
-      if (error.code === 'API_ERROR' || error.code === 'RATE_LIMIT_ERROR') {
-        console.warn(`API Error in ${component}:`, error);
-      }
-    }
-  });
-}
-
-export function useLocationErrorHandler(component: string) {
-  return useErrorHandler({
-    component,
-    enableNetworkMonitoring: false,
-    onError: (error) => {
-      if (error.code === 'LOCATION_ERROR') {
-        console.warn(`Location Error in ${component}:`, error);
-      }
-    }
-  });
-}
-
-export function useBookingErrorHandler(component: string) {
-  return useErrorHandler({
-    component,
-    enableNetworkMonitoring: true,
-    onError: (error) => {
-      if (error.code === 'BOOKING_ERROR') {
-        console.warn(`Booking Error in ${component}:`, error);
-      }
-    }
-  });
 }
